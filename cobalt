@@ -1,0 +1,539 @@
+cobalt = {
+	graphics = { },
+	filesystem = { },
+	event = { },
+	window = { },
+	_mainloop = true,
+	keyboard = {
+		keysdown = { },
+	},
+	rednet = {
+
+	},
+	application = {
+		backColour = colours.black,
+		foreColour = colours.white,
+	},
+	math = { },
+	mouse = { },
+	table = { },
+	state = "Main",
+	version = "1.1_3",
+	updatespeed = 0.1,
+}
+
+cobalt.surface = dofile( "cobalt-lib/surface" )
+
+cobalt.updatetimer = os.startTimer( cobalt.updatespeed )
+local callbacks = { }
+function cobalt.debug( item )
+	local f = fs.open( ".cobaltdebug", "w" )
+	f.write(item)
+	f.close()
+	cobalt.exit()
+end
+
+function cobalt.newCallback( event, func )
+	callbacks[event] = func
+end
+
+
+local function getFile( file, path )
+	local dl = http.get( "https://raw.githubusercontent.com/ebernerd/Cobalt/master/"..file )
+	if dl then
+		local h = dl.readAll()
+		dl.close()
+		return h
+	end
+	return false
+end
+
+if not fs.isDir( ".err-logs" ) then
+	fs.makeDir( ".err-logs" )
+end
+
+local args = { ... }
+if args[1] == "version" then
+	print( "Cobalt " .. cobalt.version )
+	v = getFile( "version" ):sub(1,-2)
+	if v then
+		if cobalt.version ~= v then
+			print( "Your Cobalt version is out of date!\nYour Version: " .. cobalt.version .. " | Current: " .. v )
+			print( "\nUse the command \"cobalt update\" to receive the newest update!" )
+		end
+	else
+		print( "Cobalt version checking is not available at this time. Is HTTP and HTTPS enabled?" )
+	end
+elseif args[1] == "update" then
+	shell.run( "pastebin run h5h4fm3t" )
+elseif args[1] == "help" then
+	print( "You can find help resources here: ")
+	print( "https://github.com/ebernerd/Cobalt/wiki")
+elseif args[1] == "examples" then
+	if fs.isDir( "cobalt-examples" ) then
+		if args[2] then
+			if fs.exists( "cobalt-examples/" .. args[2] ) then
+				shell.run( "cobalt-examples/" .. args[2] )
+			else
+				print( "List of Cobalt examples: ")
+				for i, v in pairs( fs.list( "cobalt-examples" ) ) do
+					print( "-" .. v )
+				end
+			end
+		else
+			print( "List of Cobalt examples: ")
+			for i, v in pairs( fs.list( "cobalt-examples" ) ) do
+				print( "-" .. v )
+			end
+		end
+	else
+		print( "Download the Cobalt examples here" )
+		print( "http://github.com/ebernerd")
+	end
+end
+
+cobalt.g = cobalt.graphics
+cobalt.k = cobalt.keyboard
+cobalt.fs = cobalt.filesystem
+cobalt.e = cobalt.event
+cobalt.w = cobalt.window
+cobalt.m = cobalt.mouse
+
+local graphics_lighten = {
+	[colours.black] = colours.grey,
+	[colours.grey] = colours.lightGrey,
+	[colours.lightGrey] = colours.white,
+	[colours.white] = colours.white,
+
+	[colours.blue] = colours.cyan,
+	[colours.cyan] = colours.lightBlue,
+	[colours.lightBlue] = colours.white,
+
+	[colours.green] = colours.lime,
+	[colours.lime] = colours.white,
+
+	[colours.brown] = colours.orange,
+	[colours.orange] = colours.yellow,
+	[colours.yellow] = colours.white,
+
+	[colours.red] = colours.pink,
+	[colours.pink] = colours.white,
+
+	[colours.purple] = colours.magenta,
+	[colours.magenta] = colours.white,
+
+}
+
+local graphics_darken = {
+	[colours.white] = colours.lightGrey,
+	[colours.lightGrey] = colours.grey,
+	[colours.grey] = colours.grey,
+
+	[colours.lightBlue] = colours.cyan,
+	[colours.cyan] = colours.blue,
+
+	[colours.lime] = colours.green,
+
+	[colours.yellow] = colours.orange,
+	[colours.orange] = colours.brown,
+
+	[colours.pink] = colours.red,
+	[colours.magenta] = colours.purple,
+}
+
+--[=[ GRAPHICS FUNCTIONS ]=]--
+function cobalt.graphics.print( text, x, y, colour, backColour )
+	local x = x or 1
+	local y = y or 1
+	text = tostring(text) or "Some Text"
+	if cobalt.application.view then
+		cobalt.application.view:drawText( cobalt.math.round(x), cobalt.math.round(y), text, colour, backColour )
+	end
+end
+function cobalt.graphics.rect( mode, x, y, w, h, colour )
+	if cobalt.application.view then
+		if mode == "fill" then
+			cobalt.application.view:fillRect( cobalt.math.round(x), cobalt.math.round(y), cobalt.math.round(w+x), cobalt.math.round(h+y), " ", colour )
+		elseif mode == "line" then
+			cobalt.application.view:drawRect( cobalt.math.round(x), cobalt.math.round(y), cobalt.math.round(w+x), cobalt.math.round(h+y), " ", colour )
+		end
+	end
+end
+function cobalt.graphics.center( text, y, offset, lim, colour, backColour )
+	local text = tostring(text) or "Some Text"
+	local y = y or 1
+	local offset = offset or 0
+	local lim = lim or cobalt.window.getWidth()
+	if lim > cobalt.window.getWidth() then
+		lim = cobalt.window.getWidth()
+	end
+	if cobalt.application.view then
+		local t = {}
+		for i in string.gmatch( text, "%S+" ) do
+			t[#t+1] = i
+		end
+		local lines = {[1] = ""}
+		local line = 1
+		for i=1, #t do
+			if #tostring(lines[line].." "..t[i]) > lim then
+				lines[line] = lines[line] .. "\n"
+				line = line + 1
+				lines[line] = " " .. t[i]
+			else
+				lines[line] = lines[line] .. " " .. t[i]
+			end
+		end
+		y = y or math.ceil(dy/2-#lines/2)
+		for i = 1, #lines do
+			cobalt.application.view:drawText( cobalt.math.round(cobalt.window.getWidth()/2-#lines[i]/2), cobalt.math.round(y+(i-1)), lines[i], colour, backColour )
+		end
+	end
+end
+
+cobalt.graphics.rectangle = cobalt.graphics.rect
+
+function cobalt.graphics.pixel( x, y, colour )
+	--if cobalt.application.view then
+		cobalt.application.view:drawPixel( cobalt.math.round(x), cobalt.math.round(y), " ", colour, colour )
+	--end
+end
+
+function cobalt.graphics.line( x1, y1, x2, y2, backColour, colour )
+	if cobalt.application.view then
+		cobalt.application.view:drawLine( cobalt.math.round(x1), cobalt.math.round(y1), cobalt.math.round(x2), cobalt.math.round(y2), " ", backColour, colour )
+	end
+end
+
+function cobalt.graphics.lighten( colour )
+	return graphics_lighten[colour]
+end
+
+function cobalt.graphics.darken( colour )
+	return graphics_darken[colour]
+end
+
+
+function cobalt.graphics.clear()
+	return cobalt.application.view:clear()
+end
+
+function cobalt.graphics.reset()
+	cobalt.application.view = nil
+	cobalt.application.view = cobalt.surface.create( cobalt.window.getWidth(), cobalt.window.getHeight(), " ", cobalt.application.backColour, cobalt.application.foreColour )
+end
+
+--[=[WINDOW FUNCTIONS]=]--
+function cobalt.window.getWidth()
+	local x, _ = term.getSize()
+	return x
+end
+
+function cobalt.window.getHeight()
+	local _, y = term.getSize()
+	return y
+end
+
+cobalt.window.getSize = term.getSize
+
+--[=[ MOUSE FUNCTIONS ]=]--
+function cobalt._mousepressed( x, y, button )
+	cobalt.mouse[button] = true
+
+	if cobalt.mousepressed then cobalt.mousepressed( x, y, button ) end
+end
+
+function cobalt._mousereleased( x, y, button )
+	cobalt.mouse[button] = false
+
+	if cobalt.mousereleased then cobalt.mousereleased( x, y, button ) end
+end
+
+function cobalt.mouse.isDown( button )
+	return cobalt.mouse[button]
+end
+
+
+--[=[KEYBOARD FUNCTIONS]=]--
+function cobalt._keypressed( key, keycode )
+	if key then
+		cobalt.keyboard.keysdown[key] = true
+	end
+	if keycode then
+		cobalt.keyboard.keysdown[keycode] = true
+	end
+
+
+	if cobalt.keypressed then cobalt.keypressed( key, keycode ) end
+end
+
+function cobalt._keyreleased( key, keycode )
+	if key then
+		cobalt.keyboard.keysdown[key] = nil
+	end
+	if keycode then
+		cobalt.keyboard.keysdown[keycode] = nil
+	end
+
+	if cobalt.keyreleased then cobalt.keyreleased( key, keycode ) end
+end
+
+function cobalt.keyboard.isDown( key )
+	if not key then
+		if #cobalt.keyboard.keysdown > 0 then
+			return true
+		end
+	else
+		if cobalt.keyboard.keysdown[key] then
+			return true
+		end
+	end
+	return false
+end
+
+
+function cobalt.math.round(num, idp)
+	local mult = 10^(idp or 0)
+	return math.floor(num * mult + 0.5) / mult
+end
+
+function cobalt.math.clamp( val, lower, upper )
+	if lower > upper then lower, upper = upper, lower end
+	return math.max( lower, math.min( upper, val ) )
+end
+
+
+--[=[REDNET FUNCTIONS]=]--
+function cobalt.rednet.receive(time, ret)
+
+end
+
+--[=[STATE FUNCTIONS]=]--
+function cobalt.getState()
+	return cobalt.state
+end
+
+function cobalt.getPercentage( str )
+	if type(str) == "string" then
+		if str:sub( #str ) == "%" then
+			local perc = str:sub( 1, #str-1 )
+			perc = tonumber(perc)
+			if perc > 100 or perc < 0 then
+				error( "Invalid percentage" )
+			else
+				return perc/100
+			end
+		else
+			error("Expected number or percentage")
+		end
+	end
+end
+
+function cobalt.setPercentage( perc )
+	return perc --Dunno if this will work.
+end
+
+
+--[=[FILESYSTEM FUNCTIONS]=]--
+cobalt.filesystem.list = fs.list
+cobalt.filesystem.getDirectoryItems = fs.list
+cobalt.filesystem.isFile = fs.exists
+cobalt.filesystem.isDirectory = fs.isDir
+--cobalt.filesystem.currentDir = shell.dir()
+
+cobalt.raw = false
+
+function cobalt.exit( ... )
+	local msgs = { ... }
+	cobalt._mainloop = false
+	for i = 1, 10 do
+		term.setBackgroundColour(colours.black)
+		term.setTextColour( colours.white )
+		term.clear()
+		term.setCursorPos( 1, 1 )
+	end
+	if #msgs >= 1 then
+		for i =1, #msgs do
+			print( msgs[i] )
+		end
+	end
+	return true
+end
+
+function cobalt.halt()
+	cobalt._mainloop = false
+end
+
+local function cerr( reason )
+
+
+	if cobalt.onError then
+		local ok, err2 = pcall(cobalt.onError, reason)
+		if not ok then
+			cobalt.application.view = nil
+			cobalt.application.view = cobalt.surface.create( cobalt.window.getWidth(), cobalt.window.getHeight(), " ", colours.blue, colours.white )
+			cobalt.graphics.center( "Cobalt Error Report", 2 )
+			cobalt.graphics.center( "Your error handler errored. Nice job. Here's why:", 4, 0, 40 )
+			cobalt.graphics.center( err2 or "No further information", 8, 0, 40, nil, colours.yellow )
+			local saveLoc = ".err-logs/" .. os.day() .. "-" .. os.time()
+			local f = fs.open( saveLoc, "w" )
+			local saveStr = "err-handler-exception: " .. err2 .. "\nprogram-exception: " .. reason
+			f.write( saveStr or "No further information" )
+			f.close()
+			cobalt.graphics.center( "This error has been saved to \""..saveLoc.."\" for future use.", 12, 0, 40 )
+			cobalt.application.view:render()
+			sleep( 0.5 )
+			cobalt.graphics.center( "Press any key to exit.", cobalt.window.getHeight()-1 )
+			cobalt.application.view:render()
+			os.pullEvent( "key_up" )
+			cobalt.exit()
+		end
+	else
+		cobalt.application.view = nil
+		cobalt.application.view = cobalt.surface.create( cobalt.window.getWidth(), cobalt.window.getHeight(), " ", colours.blue, colours.white )
+		cobalt.graphics.center( "Cobalt Error Report", 2 )
+		cobalt.graphics.center( "Your program has encountered an error, which has been traced back to:", 4, 0, 40 )
+		cobalt.graphics.center( reason or "No further information", 8, 0, 40, nil, colours.yellow )
+		local saveLoc = ".err-logs/" .. os.day() .. "-" .. os.time()
+		local f = fs.open( saveLoc, "w" )
+		f.write( reason or "No further information" )
+		f.close()
+		cobalt.graphics.center( "This error has been saved to \""..saveLoc.."\" for future use.", 12, 0, 40 )
+		cobalt.application.view:render()
+		sleep( 0.5 )
+		cobalt.graphics.center( "Press any key to exit.", cobalt.window.getHeight()-1 )
+		cobalt.application.view:render()
+		os.pullEvent( "key_up" )
+		cobalt.exit()
+	end
+	cobalt.halt()
+	
+end
+
+local function update()
+	if cobalt.update then 
+		local ok, err = pcall(cobalt.update, cobalt.updatespeed)
+		if not ok then
+			cerr( err )
+		end
+	end
+	cobalt.updatetimer = os.startTimer( cobalt.updatespeed )
+	if cobalt.draw then 
+		if cobalt.application.view then 
+			cobalt.application.view:clear(" ", cobalt.application.backColour, cobalt.application.foreColour ); 
+		end cobalt.draw(); 
+		if cobalt.application.view then 
+			cobalt.application.view:render() 
+		end 
+	end
+end
+
+function cobalt.initLoop( runOnce )
+	term.clear()
+	term.setCursorPos( 1, 1 )
+	cobalt.graphics.reset()
+	while cobalt._mainloop do
+
+		local e, a, b, c, d, e
+		if cobalt.raw then
+			e, a, b, c, d, e = os.pullEventRaw()
+		else
+			e, a, b, c, d, e = os.pullEvent()
+		end
+		if cobalt.on then
+			local ok, err = pcall(cobalt.on, e, a, b, c, d, e)
+			if not ok then
+				cerr( err )
+			end
+		end
+		if callbacks[event] then
+			local ok, err = pcall(callbacks[event], a, b, c, d, e )
+			if not ok then
+				cerr( err )
+			end
+		end
+		if e == "char" then
+			if cobalt.textinput then	
+				local ok, err = pcall(cobalt.textinput, a)
+				if not ok then
+					cerr( err )
+				end
+			end
+		elseif e == "key" then
+			local ok, err = pcall(cobalt._keypressed, a, keys.getName( a ) )
+			if not ok then
+				cerr( err )
+			end
+		elseif e == "key_up" then
+			local ok, err = pcall(cobalt._keyreleased, a, keys.getName( a ) )
+			if not ok then
+				cerr( err )
+			end
+		elseif e == "mouse_click" then
+			if cobalt.mousepressed then 
+				local ok, err = pcall(cobalt.mousepressed, b, c, a)
+				if not ok then
+					cerr( err )
+				end
+			end --b, c, a to keep love.mousepressed syntax as( x, y, button ), not ( button, x, y )
+		elseif e == "mouse_up" then
+			if cobalt.mousereleased then 
+				local ok, err = pcall(cobalt.mousereleased, b, c, a )
+				if not ok then
+					cerr( err )
+				end 
+			end
+		elseif e == "rednet_message" then
+			if cobalt.rednetreceive then 
+				local ok, err = pcall(cobalt.rednetreceive, a, b, c)
+				if not ok then
+					cerr( err )
+				end
+			end
+		elseif e == "monitor_touch" then
+			if cobalt.monitortouch then 
+				local ok, err = pcall(cobalt.monitortouch, x, y)
+				if not ok then
+					cerr( err )
+				end
+			else 
+				local ok, err = pcall(cobalt.mousereleased, x, y )
+				if not ok then
+					cerr( err )
+				end
+			end
+		elseif e == "mouse_drag" then
+			if cobalt.mousedrag then 
+				local ok, err = pcall(cobalt.mousedrag, x, y )
+				if not ok then
+					cerr( err )
+				end
+			end
+		elseif e == "timer" then
+			if a == cobalt.updatetimer then
+				local ok, err = pcall( update )
+				if not ok then
+					cerr( err )
+				end
+			end
+		elseif e == "paste" then
+			if cobalt.paste then 
+				local ok, err = pcall(cobalt.paste, a)
+				if not ok then
+					cerr( err )
+				end
+			end
+		end
+
+
+		if runOnce then cobalt._mainloop = false; return end
+	end
+end
+
+function cobalt.initOnce()
+	cobalt.initLoop( true )
+end
+
+cobalt.init = cobalt.initLoop
+
+
+return cobalt
