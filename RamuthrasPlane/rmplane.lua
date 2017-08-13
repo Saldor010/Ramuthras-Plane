@@ -1,11 +1,57 @@
 -- Ramuthra's Plane
 -- By Saldor010
-local version = "0.1_0"
+local version = "0.2_0"
 local cobalt = dofile("cobalt")
 cobalt.ui = dofile("cobalt-ui/init.lua")
 
+local args = {...}
+local application = args[1] or "rmplane"
+
 local tick = 0
 local tickRate = 0.2
+
+local lastMouse = {}
+lastMouse.x = 0
+lastMouse.y = 0
+lastMouse.cx = 0
+lastMouse.cy = 0
+
+local mapmaker = {}
+mapmaker.GUI = {}
+
+mapmaker.GUI.IDType = "tile"
+mapmaker.GUI.IDPanel = cobalt.ui.new({x=37,y=2,w=12,h=3,backColour = nil})
+mapmaker.GUI.IDField = mapmaker.GUI.IDPanel:add("input",{w=12,h=1,y=1,placeholder="Tile ID"})
+mapmaker.GUI.IDTileButton = mapmaker.GUI.IDPanel:add("button",{w=12,h=1,y=2,text="Tile"})
+mapmaker.GUI.IDEntityButton = mapmaker.GUI.IDPanel:add("button",{w=12,h=1,y=3,text="Entity"})
+
+mapmaker.GUI.IDTileButton.onclick = function()
+	mapmaker.GUI.IDType = "tile"
+	mapmaker.GUI.IDField.placeholder = "Tile ID"
+end
+
+mapmaker.GUI.IDEntityButton.onclick = function()
+	mapmaker.GUI.IDType = "entity"
+	mapmaker.GUI.IDField.placeholder = "Entity ID"
+end
+
+mapmaker.GUI.saveButtonPanel = cobalt.ui.new({x=1,y=19,w=6,h=1})
+mapmaker.GUI.saveButton = mapmaker.GUI.saveButtonPanel:add("button",{text="Save",w=6,h=1})
+
+--mapmaker.GUI.savePrompt = cobalt.ui.new({x="25%",y="25%",w="50%",h="50%",backColour = colors.cyan})
+--mapmaker.GUI.savePromptText = mapmaker.GUI.savePrompt:add("text",{x="25%",y="25%",w="50%",h="25%"})
+
+--mapmaker.GUI.paintSelection = cobalt.ui.new({w=10,h=15,backColour=nil,foreColour=nil})
+
+mapmaker.paint = {}
+mapmaker.paint.Selection = nil
+
+if application ~= "mapmaker" then
+	for k,v in pairs(mapmaker.GUI) do
+		if v.x then v.x = -100 end
+		if v.y then v.y = -100 end
+	end
+end
 
 local players = {
 	["localPlayer"] = {
@@ -81,43 +127,13 @@ local function findTile(x,y)
 	return tile,entity
 end
 
-local tileTypes = {
-	[1] = {
-		["name"] = "Cave Wall",
-		["description"] = "A rough wall of slate",
-		["icon"] = {
-			["text"] = " ",
-			["bg"] = colors.gray,
-			["fg"] = colors.black,
-		},
-		["passable"] = false,
-		["perceptionRequirement"] = 0,
-		["scripts"] = {},
-	},
-	[2] = {
-		["name"] = "Spawn",
-		["description"] = "",
-		["icon"] = {
-			["text"] = " ",
-			["bg"] = colors.black,
-			["fg"] = colors.black,
-		},
-		["passable"] = true,
-		["perceptionRequirement"] = 99,
-		["scripts"] = {
-			["onload"] = function(tile,tx,ty)
-				for k,v in pairs(players) do
-					v.x = tx
-					v.y = ty
-				end
-			end,
-		},
-	}
-}
+local objectManager = dofile(shell.resolve(".").."/objectmanager.lua")
+tileTypes = objectManager.loadTileTypes()
+entityTypes = objectManager.loadEntityTypes()
 
-local entityTypes = {
-
-}
+if application == "mapmaker" then
+	
+end
 
 local function loadMap(file)
 	map.tileMap = {}
@@ -151,7 +167,8 @@ local function loadMap(file)
 					tile.x = tonumber("0x"..string.sub(line,1,2))
 					tile.y = tonumber("0x"..string.sub(line,3,4))
 					tile.type = tonumber("0x"..string.sub(line,5,7))
-					local whereTo = tonumber("0x"..string.sub(line,8,8))
+					tile.metaData = tonumber("0x"..string.sub(line,8,9))
+					local whereTo = tonumber("0x"..string.sub(line,10,10))
 					if whereTo == 0 then
 						if tileTypes[tile.type] then
 							for k,v in pairs(tileTypes[tile.type]) do
@@ -178,22 +195,83 @@ local function loadMap(file)
 			for j=1,map.ySize do
 				if map["tileMap"][i][j] then
 					if map["tileMap"][i][j].scripts and map["tileMap"][i][j].scripts.onload then
-						map["tileMap"][i][j].scripts.onload(map["tileMap"][i][j],i,j)
+						local localArgs = map["tileMap"][i][j].scripts.onload(map["tileMap"][i][j],i,j,{
+							["players"] = players,
+						})
+						
+						if localArgs and localArgs["tile"] then
+							for k,v in pairs(localArgs["tile"]) do
+								map["tileMap"][i][j][k] = v
+							end
+						end
 					end
 				end
 			end
 		end
+		
 		local player = players["localPlayer"]
-		camera.x = player.x
-		camera.y = player.y
+		camera.x = player.x-math.floor(camera.xSize/2)
+		camera.y = player.y-math.floor(camera.ySize/2)
 		while camera.x+camera.xSize > map.xSize do camera.x = camera.x - 1 end
 		while camera.y+camera.ySize > map.ySize do camera.y = camera.y - 1 end
+		while camera.x < 0 do camera.x = camera.x + 1 end
+		while camera.y < 0 do camera.y = camera.y + 1 end
 	else
 		error("No map exists")
 	end
 end
 
-loadMap(fs.getDir(shell.getRunningProgram()).."/maps/level1.rpmap")
+local function saveMap(filePath,name,mapX,mapY)
+	--if fs.exists(filePath) then return false else
+		local handle = fs.open(filePath,"w")
+		handle.writeLine(name)
+		handle.writeLine(mapX)
+		handle.writeLine(mapY)
+		for k,v in pairs(map.tileMap) do
+			for p,b in pairs(v) do
+				if b and b.type then
+					local hX = string.format("%x",tostring(k)) -- convert the decimal to hex
+					local hY = string.format("%x",tostring(p))
+					local hType = string.format("%x",tostring(b.type))
+					local hMetaData = string.format("%x",tostring(b.metaData))
+					
+					while string.len(hX) < 2 do hX = "0"..hX end
+					while string.len(hY) < 2 do hY = "0"..hY end
+					while string.len(hType) < 3 do hType = "0"..hType end
+					while string.len(hMetaData) < 2 do hMetaData = "0"..hMetaData end
+					
+					handle.writeLine(hX..hY..hType..hMetaData..0)
+				end
+			end
+		end
+		for k,v in pairs(map.entityMap) do
+			for p,b in pairs(v) do
+				if b and b.type then
+					local hX = string.format("%x",tostring(k)) -- convert the decimal to hex
+					local hY = string.format("%x",tostring(p))
+					local hType = string.format("%x",tostring(b.type))
+					local hMetaData = string.format("%x",tostring(b.metaData))
+					
+					while string.len(hX) < 2 do hX = "0"..hX end
+					while string.len(hY) < 2 do hX = "0"..hX end
+					while string.len(hType) < 3 do hX = "0"..hX end
+					while string.len(hMetaData) < 2 do hMetaData = "0"..hMetaData end
+					
+					handle.writeLine(hX..hY..hType..hMetaData..1)
+				end
+			end
+		end
+		
+		handle.close()
+		return true
+	--end
+end
+
+mapmaker.GUI.saveButton.onclick = function()
+	saveMap(fs.getDir(shell.getRunningProgram()).."/maps/savedmap.rpmap","testmap",255,255)
+end
+
+loadMap(fs.getDir(shell.getRunningProgram()).."/maps/savedmap.rpmap")
 
 function cobalt.update( dt )
 	tick = tick + dt
@@ -202,6 +280,8 @@ function cobalt.update( dt )
 		-- game update
 		
 	end
+	
+	cobalt.ui.update(dt)
 end
 
 function cobalt.draw()
@@ -217,28 +297,71 @@ function cobalt.draw()
 			end
 		end
 	end
-	for k,v in pairs(players) do
-		if v.x >= camera.x and v.x <= camera.x+camera.xSize then
-			if v.y >= camera.y and v.y <= camera.y+camera.ySize then
-				cobalt.graphics.print(v["icon"]["text"],v.x-camera.x,v.y-camera.y,v["icon"]["bg"],v["icon"]["fg"])
+	
+	if application == "rmplane" then
+		for k,v in pairs(players) do
+			if v.x >= camera.x and v.x <= camera.x+camera.xSize then
+				if v.y >= camera.y and v.y <= camera.y+camera.ySize then
+					cobalt.graphics.print(v["icon"]["text"],v.x-camera.x,v.y-camera.y,v["icon"]["bg"],v["icon"]["fg"])
+				end
 			end
 		end
 	end
+	
+	if application == "mapmaker" then
+		cobalt.graphics.print("Camera X - "..camera.x,3,17,nil,colors.white)
+		cobalt.graphics.print("Camera Y - "..camera.y,3,18,nil,colors.white)
+		cobalt.graphics.print("Mouse X - "..lastMouse.x+lastMouse.cx,20,17,nil,colors.white)
+		cobalt.graphics.print("Mouse Y - "..lastMouse.y+lastMouse.cy,20,18,nil,colors.white)
+	end
+	
+	cobalt.ui.draw()
 end
 
 function cobalt.mousepressed( x, y, button )
-
+	lastMouse.x = x
+	lastMouse.y = y
+	lastMouse.cx = camera.x
+	lastMouse.cy = camera.y
+	
+	if application == "mapmaker" then
+		if x > 0 and x <= camera.xSize and y > 0 and y <= camera.ySize then
+			if mapmaker.GUI.IDType == "tile" then
+				if tileTypes[tonumber(mapmaker.GUI.IDField.text)] then
+					if map.tileMap[lastMouse.x+lastMouse.cx] and map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] then
+						map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] = tileTypes[tonumber(mapmaker.GUI.IDField.text)]
+						map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy].x = lastMouse.x+lastMouse.cx
+						map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy].y = lastMouse.y+lastMouse.cy
+						map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy].type = tonumber(mapmaker.GUI.IDField.text)
+						map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy].metaData = 0
+					end
+				end
+			elseif mapmaker.GUI.IDType == "entity" then
+				if entityTypes[tonumber(mapmaker.GUI.IDField.text)] then
+					if map.entityMap[lastMouse.x+lastMouse.cx] and map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] then
+						map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] = entityTypes[tonumber(mapmaker.GUI.IDField.text)]
+						map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy].x = lastMouse.x+lastMouse.cx
+						map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy].y = lastMouse.y+lastMouse.cy
+						map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy].type = tonumber(mapmaker.GUI.IDField.text)
+						map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy].metaData = 0
+					end
+				end
+			end
+		end
+	end
+	
+	cobalt.ui.mousepressed(x,y,button)
 end
 
 function cobalt.mousereleased( x, y, button )
-
+	cobalt.ui.mousereleased(x,y,button)
 end
 
-local function moveCamera(player)
+local function moveCamera(player,tx,ty)
 	local xCenter = camera.x+math.floor(camera.xSize/2)
 	local yCenter = camera.y+math.floor(camera.ySize/2)
 	
-	if player.x - xCenter > 4 and camera.x < map.xSize-camera.xSize then
+	--[[if player.x - xCenter > 4 and camera.x < map.xSize-camera.xSize then
 		camera.x = camera.x + 1
 	elseif player.x - xCenter < -4 and camera.x > 0 then
 		camera.x = camera.x - 1
@@ -246,48 +369,63 @@ local function moveCamera(player)
 		camera.y = camera.y + 1
 	elseif player.y - yCenter < -4 and camera.y > 0 then
 		camera.y = camera.y - 1
-	end
+	end]]--
+	camera.x = camera.x + tx
+	camera.y = camera.y + ty
 end
 
 function cobalt.keypressed( keycode, key )
 	if key == "left" or key == "up" or key == "right" or key == "down" then
 		local moveSuccess = false
 		local player = players["localPlayer"]
-		if key == "left" then
-			if findTile(player.x-1,player.y) then
-				local t,e = findTile(player.x-1,player.y)
-				if (t.passable or t.type == nil) and e.type == nil then
-					player.x = player.x - 1
-					moveCamera(player)
-					moveSuccess = true
+		
+		if application == "rmplane" then
+			if key == "left" then
+				if findTile(player.x-1,player.y) then
+					local t,e = findTile(player.x-1,player.y)
+					if (t.passable or t.type == nil) and e.type == nil then
+						player.x = player.x - 1
+						moveCamera(player,-1,0)
+						moveSuccess = true
+					end
+				end
+			elseif key == "right" then
+				if findTile(player.x+1,player.y) then
+					local t,e = findTile(player.x+1,player.y)
+					if (t.passable or t.type == nil) and e.type == nil then
+						player.x = player.x + 1
+						moveCamera(player,1,0)
+						moveSuccess = true
+					end
+				end
+			elseif key == "up" then
+				if findTile(player.x,player.y-1) then
+					local t,e = findTile(player.x,player.y-1)
+					if (t.passable or t.type == nil) and e.type == nil then
+						player.y = player.y - 1
+						moveCamera(player,0,-1)
+						moveSuccess = true
+					end
+				end
+			elseif key == "down" then
+				if findTile(player.x,player.y+1) then
+					local t,e = findTile(player.x,player.y+1)
+					if (t.passable or t.type == nil) and e.type == nil then
+						player.y = player.y + 1
+						moveCamera(player,0,1)
+						moveSuccess = true
+					end
 				end
 			end
-		elseif key == "right" then
-			if findTile(player.x+1,player.y) then
-				local t,e = findTile(player.x+1,player.y)
-				if (t.passable or t.type == nil) and e.type == nil then
-					player.x = player.x + 1
-					moveCamera(player)
-					moveSuccess = true
-				end
-			end
-		elseif key == "up" then
-			if findTile(player.x,player.y-1) then
-				local t,e = findTile(player.x,player.y-1)
-				if (t.passable or t.type == nil) and e.type == nil then
-					player.y = player.y - 1
-					moveCamera(player)
-					moveSuccess = true
-				end
-			end
-		elseif key == "down" then
-			if findTile(player.x,player.y+1) then
-				local t,e = findTile(player.x,player.y+1)
-				if (t.passable or t.type == nil) and e.type == nil then
-					player.y = player.y + 1
-					moveCamera(player)
-					moveSuccess = true
-				end
+		else -- MAP MAKER
+			if key == "left" and camera.x > 0 then
+				camera.x = camera.x - 1
+			elseif key == "right" and camera.x+camera.xSize < map.xSize then
+				camera.x = camera.x + 1
+			elseif key == "up" and camera.y > 0 then
+				camera.y = camera.y - 1
+			elseif key == "down" and camera.y+camera.ySize < map.ySize then
+				camera.y = camera.y + 1
 			end
 		end
 		
@@ -295,14 +433,15 @@ function cobalt.keypressed( keycode, key )
 			tick = tickRate -- Force an update when we move
 		end
 	end
+	cobalt.ui.keypressed(keycode,key)
 end
 
 function cobalt.keyreleased( keycode, key )
-
+	cobalt.ui.keyreleased(keycode,key)
 end
 
 function cobalt.textinput( t )
-
+	cobalt.ui.textinput(t)
 end
 
 cobalt.initLoop()
