@@ -16,14 +16,22 @@ lastMouse.y = 0
 lastMouse.cx = 0
 lastMouse.cy = 0
 
+local bresenham = dofile(shell.resolve(".").."/bresenham.lua")
+
+local rmplaneGUI = {}
+rmplaneGUI.inspectPanel = cobalt.ui.new({x=37,y=2,w=14,h=12,backColour=colors.black})
+rmplaneGUI.inspectPanel.nameLabel = rmplaneGUI.inspectPanel:add("text",{x=1,y=1,h=1,w=14,text="",foreColour=colors.white,backColour=colors.black})
+rmplaneGUI.inspectPanel.descriptionLabel = rmplaneGUI.inspectPanel:add("text",{x=1,y=3,h=4,w=14,text="",foreColour=colors.white,backColour=colors.black})
+
 local mapmaker = {}
 mapmaker.GUI = {}
 
 mapmaker.GUI.IDType = "tile"
-mapmaker.GUI.IDPanel = cobalt.ui.new({x=37,y=2,w=12,h=3,backColour = nil})
+mapmaker.GUI.IDPanel = cobalt.ui.new({x=37,y=2,w=12,h=4,backColour = nil})
 mapmaker.GUI.IDField = mapmaker.GUI.IDPanel:add("input",{w=12,h=1,y=1,placeholder="Tile ID"})
 mapmaker.GUI.IDTileButton = mapmaker.GUI.IDPanel:add("button",{w=12,h=1,y=2,text="Tile"})
 mapmaker.GUI.IDEntityButton = mapmaker.GUI.IDPanel:add("button",{w=12,h=1,y=3,text="Entity"})
+mapmaker.GUI.IDMetaDataField = mapmaker.GUI.IDPanel:add("input",{w=12,h=1,y=4,placeholder="Metadata"})
 
 mapmaker.GUI.IDTileButton.onclick = function()
 	mapmaker.GUI.IDType = "tile"
@@ -48,6 +56,13 @@ mapmaker.paint.Selection = nil
 
 if application ~= "mapmaker" then
 	for k,v in pairs(mapmaker.GUI) do
+		if v.x then v.x = -100 end
+		if v.y then v.y = -100 end
+	end
+end
+
+if application ~= "rmplane" then
+	for k,v in pairs(rmplaneGUI) do
 		if v.x then v.x = -100 end
 		if v.y then v.y = -100 end
 	end
@@ -105,7 +120,9 @@ local map = {
 	["xSize"] = 10,
 	["ySize"] = 10,
 	["tileMap"] = {},
+	["tileMapMemory"] = {},
 	["entityMap"] = {},
+	["entityMapMemory"] = {},
 }
 
 local camera = {
@@ -140,7 +157,7 @@ local function loadMap(file)
 	map.entityMap = {}
 	if fs.exists(file) then
 		local handle = fs.open(file,"r")
-		local loadedMap = {["entityMap"]={},["tileMap"]={}}
+		local loadedMap = {["entityMap"]={},["tileMap"]={},["entityMapMemory"] = {},["tileMapMemory"] = {}}
 		local ct = 0
 		while true do
 			local line = handle.readLine()
@@ -153,6 +170,8 @@ local function loadMap(file)
 					for i=1,tonumber(line) do
 						loadedMap["entityMap"][i] = {}
 						loadedMap["tileMap"][i] = {}
+						loadedMap["entityMapMemory"][i] = {}
+						loadedMap["tileMapMemory"][i] = {}
 					end
 				elseif ct == 3 then
 					loadedMap.ySize = tonumber(line)
@@ -160,6 +179,8 @@ local function loadMap(file)
 						for j=1,tonumber(line) do
 							loadedMap["entityMap"][i][j] = {}
 							loadedMap["tileMap"][i][j] = {}
+							loadedMap["entityMapMemory"][i] = {}
+							loadedMap["tileMapMemory"][i] = {}
 						end
 					end
 				else
@@ -199,8 +220,8 @@ local function loadMap(file)
 							["players"] = players,
 						})
 						
-						if localArgs and localArgs["tile"] then
-							for k,v in pairs(localArgs["tile"]) do
+						if localArgs and localArgs["object"] then
+							for k,v in pairs(localArgs["object"]) do
 								map["tileMap"][i][j][k] = v
 							end
 						end
@@ -212,10 +233,10 @@ local function loadMap(file)
 		local player = players["localPlayer"]
 		camera.x = player.x-math.floor(camera.xSize/2)
 		camera.y = player.y-math.floor(camera.ySize/2)
-		while camera.x+camera.xSize > map.xSize do camera.x = camera.x - 1 end
-		while camera.y+camera.ySize > map.ySize do camera.y = camera.y - 1 end
-		while camera.x < 0 do camera.x = camera.x + 1 end
-		while camera.y < 0 do camera.y = camera.y + 1 end
+		--while camera.x+camera.xSize > map.xSize do camera.x = camera.x - 1 end
+		--while camera.y+camera.ySize > map.ySize do camera.y = camera.y - 1 end
+		--while camera.x < 0 do camera.x = camera.x + 1 end
+		--while camera.y < 0 do camera.y = camera.y + 1 end
 	else
 		error("No map exists")
 	end
@@ -273,6 +294,72 @@ end
 
 loadMap(fs.getDir(shell.getRunningProgram()).."/maps/savedmap.rpmap")
 
+local function determineVisibility(object1,object2)
+	local x1,y1 = object1.x,object1.y
+	local x2,y2 = object2.x,object2.y
+	
+	return bresenham.los(x1,y1,x2,y2,function(x,y)
+		if map.tileMap[x][y]["transparent"] == nil or map.tileMap[x][y]["transparent"] == true then
+			return true
+		else
+			return false
+		end
+	end)
+	--[[local a,b,c,A,B,C = 0,0,0,0,0,0
+	a = math.abs(object1.x - object2.x)
+	b = math.abs(object1.y - object2.y)
+	c = math.sqrt((a*a)+(b*b))
+	
+	A = math.deg(math.asin(a/c))
+	B = math.deg(math.asin(b/c))
+	C = 90
+	
+	local lowestX = object1.x
+	local lowestY = object1.y
+	if object1.x > object2.x then lowestX = object2.x end
+	if object1.y > object2.y then lowestY = object2.y end
+	
+	if a > b then
+		for i=a,1,-0.25 do
+			local x = a/i
+			local y = b/i
+			x = math.floor(x + lowestX)
+			y = math.floor(y + lowestY)
+			
+			if map.tileMap[x] and map.tileMap[x][y]  then
+				if map.tileMap[x][y].transparent == false then
+					return false
+				end
+			end
+			if map.entityMap[x] and map.entityMap[x][y] then
+				if map.entityMap[x][y].transparent == false then
+					return false
+				end
+			end
+		end
+	else
+		for i=b,1,-0.25 do
+			local x = a/i
+			local y = b/i
+			x = math.floor(x + lowestX)
+			y = math.floor(y + lowestY)
+			
+			if map.tileMap[x] and map.tileMap[x][y] then
+				if map.tileMap[x][y].transparent == false then
+					return false
+				end
+			end
+			if map.entityMap[x] and map.entityMap[x][y] then
+				if map.tileMap[x][y].transparent == false then
+					return false
+				end
+			end
+		end
+	end
+	
+	return true]]--
+end
+
 function cobalt.update( dt )
 	tick = tick + dt
 	if tick >= tickRate then
@@ -291,9 +378,26 @@ function cobalt.draw()
 	for i=camera.x,camera.x+camera.xSize do
 		for j=camera.y,camera.y+camera.ySize do
 			if map["tileMap"][i] and map["tileMap"][i][j] and map["tileMap"][i][j]["icon"] then
-				cobalt.graphics.print(map["tileMap"][i][j]["icon"]["text"],i-camera.x,j-camera.y,map["tileMap"][i][j]["icon"]["bg"],map["tileMap"][i][j]["icon"]["fg"])
+				if not map["tileMap"][i][j].x then map["tileMap"][i][j].x = i end
+				if not map["tileMap"][i][j].y then map["tileMap"][i][j].y = j end
+				if determineVisibility(players.localPlayer,map["tileMap"][i][j]) or application == "mapmaker" then
+					cobalt.graphics.print(map["tileMap"][i][j]["icon"]["text"],i-camera.x,j-camera.y,map["tileMap"][i][j]["icon"]["bg"],map["tileMap"][i][j]["icon"]["fg"])
+					map["tileMapMemory"][i][j] = map["tileMap"][i][j]
+				elseif map["tileMapMemory"][i][j] then
+					cobalt.graphics.print(map["tileMap"][i][j]["icon"]["text"],i-camera.x,j-camera.y,cobalt.graphics.darken(map["tileMap"][i][j]["icon"]["bg"]),cobalt.graphics.darken(map["tileMap"][i][j]["icon"]["fg"]))
+				else
+					cobalt.graphics.print("*",i-camera.x,j-camera.y,colors.black,colors.grey)
+				end
 			elseif map["tileMap"][i] and map["tileMap"][i][j] then
-				cobalt.graphics.print(" ",i-camera.x,j-camera.y,colors.black,colors.black)
+				if not map["tileMap"][i][j].x then map["tileMap"][i][j].x = i end
+				if not map["tileMap"][i][j].y then map["tileMap"][i][j].y = j end
+				if determineVisibility(players.localPlayer,map["tileMap"][i][j]) or application == "mapmaker" then
+					cobalt.graphics.print(" ",i-camera.x,j-camera.y,colors.black,colors.black)
+				elseif map["tileMapMemory"][i][j] then
+					cobalt.graphics.print(" ",i-camera.x,j-camera.y,colors.black,colors.black)
+				else
+					cobalt.graphics.print("*",i-camera.x,j-camera.y,colors.black,colors.grey)
+				end
 			end
 		end
 	end
@@ -329,23 +433,39 @@ function cobalt.mousepressed( x, y, button )
 			if mapmaker.GUI.IDType == "tile" then
 				if tileTypes[tonumber(mapmaker.GUI.IDField.text)] then
 					if map.tileMap[lastMouse.x+lastMouse.cx] and map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] then
-						map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] = tileTypes[tonumber(mapmaker.GUI.IDField.text)]
-						map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy].x = lastMouse.x+lastMouse.cx
-						map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy].y = lastMouse.y+lastMouse.cy
-						map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy].type = tonumber(mapmaker.GUI.IDField.text)
-						map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy].metaData = 0
+						local object = map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy]
+						for k,v in pairs(tileTypes[tonumber(mapmaker.GUI.IDField.text)]) do
+							object[k] = v
+						end
+						object.x = lastMouse.x+lastMouse.cx
+						object.y = lastMouse.y+lastMouse.cy
+						object.type = tonumber(mapmaker.GUI.IDField.text) or 0
+						object.metaData = tonumber(mapmaker.GUI.IDMetaDataField.text) or 0
 					end
 				end
 			elseif mapmaker.GUI.IDType == "entity" then
 				if entityTypes[tonumber(mapmaker.GUI.IDField.text)] then
 					if map.entityMap[lastMouse.x+lastMouse.cx] and map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] then
-						map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] = entityTypes[tonumber(mapmaker.GUI.IDField.text)]
-						map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy].x = lastMouse.x+lastMouse.cx
-						map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy].y = lastMouse.y+lastMouse.cy
-						map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy].type = tonumber(mapmaker.GUI.IDField.text)
-						map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy].metaData = 0
+						local object = map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy]
+						for k,v in pairs(tileTypes[tonumber(mapmaker.GUI.IDField.text)]) do
+							object[k] = v
+						end
+						object.x = lastMouse.x+lastMouse.cx
+						object.y = lastMouse.y+lastMouse.cy
+						object.type = tonumber(mapmaker.GUI.IDField.text) or 0
+						object.metaData = tonumber(mapmaker.GUI.IDMetaDataField.text) or 0
 					end
 				end
+			end
+		end
+	end
+	
+	if application == "rmplane" then
+		if x > 0 and x <= camera.xSize and y > 0 and y <= camera.ySize then
+			if map.tileMap[lastMouse.x+lastMouse.cx] and map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] then
+				local object = map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy]
+				rmplaneGUI.inspectPanel.nameLabel.text = object.name
+				rmplaneGUI.inspectPanel.descriptionLabel.text = object.description
 			end
 		end
 	end
@@ -370,6 +490,13 @@ local function moveCamera(player,tx,ty)
 	elseif player.y - yCenter < -4 and camera.y > 0 then
 		camera.y = camera.y - 1
 	end]]--
+	
+	--[[if math.abs(tx) > 0 and (player.x <= math.ceil(camera.xSize/2) or player.x >= map.xSize-camera.xSize) then --and (player.x <= math.floor(camera.xSize/2) or player.x <= math.floor(camera.ySize/2)) then
+		return false
+	elseif math.abs(ty) > 0 and (player.y <= math.ceil(camera.ySize/2) or player.y >= map.ySize-camera.ySize) then --and (player.x >= map.xSize-camera.xSize or player.y >= map.ySize-camera.ySize) then
+		return false
+	end]]--
+	
 	camera.x = camera.x + tx
 	camera.y = camera.y + ty
 end
