@@ -22,7 +22,7 @@ factions.monsters.enemies = factions.champions
 local entityBehavior = {}
 entityBehavior.noticeEntity = function(self,entity)
 	if entity.faction ~= self.faction then
-		if self.faction.enemies = entity.faction then
+		if self.faction.enemies == entity.faction then
 			
 		end
 	end
@@ -174,6 +174,41 @@ local tileTypes = {
 			end,
 		}
 	},
+	[4] = {
+		["name"] = "Locked Gate",
+		["description"] = "A tall, wooden gate criss crossed by steel bars",
+		["icon"] = {
+			["text"] = "=",
+			["bg"] = colors.brown,
+			["fg"] = colors.grey,
+		},
+		["passable"] = false,
+		["transparent"] = false,
+	},
+	[5] = {
+		["name"] = "Keyhole",
+		["description"] = "Looks like you need the right key to unlock this gate.",
+		["icon"] = {
+			["text"] = "O",
+			["bg"] = colors.brown,
+			["fg"] = colors.grey,
+		},
+		["passable"] = false,
+		["transparent"] = false,
+	},
+	[6] = {
+		["name"] = "Pressure Pad",
+		["description"] = "Standing on it, or placing an object on it, might cause a reaction.",
+		["icon"] = {
+			["text"] = "+",
+			["bg"] = colors.darkGrey,
+			["fg"] = colors.grey,
+		},
+		["passable"] = true,
+		["transparent"] = true,
+		["scripts"] = {},
+		["activated"] = false,
+	}
 }
 
 local entityTypes = {
@@ -222,6 +257,26 @@ local entityTypes = {
 			
 			end,
 		}
+	},
+	[1] = {
+		["name"] = "Key",
+		["description"] = "Looks like it belongs to something..",
+		["icon"] = {
+			["text"] = "K",
+			["bg"] = colors.black,
+			["fg"] = colors.white,
+		},
+		["scripts"] = {
+		}
+	},
+	[2] = {
+		["name"] = "Rock",
+		["description"] = "A large, somewhat circular grey rock.",
+		["icon"] = {
+			["text"] = "O",
+			["bg"] = colors.black,
+			["fg"] = colors.grey
+		}
 	}
 }
 
@@ -234,6 +289,78 @@ for k,v in pairs(tileTypes) do
 	for p,b in pairs(v) do
 		newTileTypes[k][p] = b
 	end
+end
+
+tileTypes[6]["scripts"]["onUpdate"] = function(object,tileMap,entityMap,players)
+	local returnData = {}
+	returnData.tileMap = {}
+	
+	if (entityMap[object.x][object.y] and entityMap[object.x][object.y]["name"]) or (players["localPlayer"]["x"] == object.x and players["localPlayer"]["y"] == object.y)then
+		for k,v in pairs(tileMap) do
+			for p,b in pairs(v) do
+				if (b.type == 4) and b.metaData == object.metaData then
+					local returnTile = b
+					returnTile["passable"] = true
+					returnTile["transparent"] = true
+					returnTile["icon"] = {
+						["text"] = " ",
+						["bg"] = colors.darkGrey,
+						["fg"] = colors.brown,
+					}
+					returnTile["name"] = "Open Gate"
+					returnTile["description"] = "A tall, wooden gate criss crossed by steel bars. It appears to be open."
+					table.insert(returnData.tileMap,returnTile)
+				end
+			end
+		end
+	else
+		for k,v in pairs(tileMap) do
+			for p,b in pairs(v) do
+				if (b.type == 4) and b.metaData == object.metaData then
+					local returnTile = b
+					returnTile["passable"] = false
+					returnTile["transparent"] = false
+					returnTile["icon"] = {
+						["text"] = "=",
+						["bg"] = colors.brown,
+						["fg"] = colors.grey,
+					}
+					returnTile["name"] = "Locked Gate"
+					returnTile["description"] = "A tall, wooden gate criss crossed by steel bars."
+					table.insert(returnData.tileMap,returnTile)
+				end
+			end
+		end
+	end
+	 
+	 return returnData
+end
+
+entityTypes[1]["scripts"]["onDrop"] = function(object,newX,newY,newTile,tileMap)
+	local returnData = {}
+	returnData.tileMap = {}
+	returnData.entityMap = {}
+	if newTile.type == 5 and newTile.metaData == object.metaData then
+		for k,v in pairs(tileMap) do
+			for p,b in pairs(v)	do
+				if (b.type == 4 or b.type == 5) and b.metaData == object.metaData then
+					local returnTile = b
+					returnTile["passable"] = true
+					returnTile["transparent"] = true
+					returnTile["icon"] = {
+						["text"] = " ",
+						["bg"] = colors.darkGrey,
+						["fg"] = colors.brown,
+					}
+					returnTile["name"] = "Open Gate"
+					returnTile["description"] = "A tall, wooden gate criss crossed by steel bars. It appears to be open."
+					table.insert(returnData.tileMap,returnTile)
+				end
+			end
+		end
+		table.insert(returnData.entityMap,{["x"] = newX,["y"] = newY})
+	end
+	return returnData
 end
 
 objectManager.loadTileTypes = function()

@@ -1,6 +1,6 @@
 -- Ramuthra's Plane
 -- By Saldor010
-local version = "0.2_0"
+local version = "0.2_0" -- Not really updating this, lol
 local cobalt = dofile("cobalt")
 cobalt.ui = dofile("cobalt-ui/init.lua")
 
@@ -9,6 +9,7 @@ local application = args[1] or "rmplane"
 
 local tick = 0
 local tickRate = 0.2
+local totalTicks = 0
 
 local lastMouse = {}
 lastMouse.x = 0
@@ -17,22 +18,27 @@ lastMouse.cx = 0
 lastMouse.cy = 0
 
 local bresenham = dofile(shell.resolve(".").."/bresenham.lua")
-local aStar = dofile(shell.resolve(".").."/astar.lua")
+--local aStar = dofile(shell.resolve(".").."/astar.lua")
 
-local rmplaneGUI = {}
-rmplaneGUI.inspectPanel = cobalt.ui.new({x=37,y=2,w=14,h=12,backColour=colors.black})
-rmplaneGUI.inspectPanel.nameLabel = rmplaneGUI.inspectPanel:add("text",{x=1,y=1,h=1,w=14,text="",foreColour=colors.white,backColour=colors.black})
-rmplaneGUI.inspectPanel.descriptionLabel = rmplaneGUI.inspectPanel:add("text",{x=1,y=3,h=4,w=14,text="",foreColour=colors.white,backColour=colors.black})
+local rmplane = {}
+rmplane.GUI = {}
+rmplane.GUI.inspectPanel = cobalt.ui.new({x=37,y=2,w=14,h=12,backColour=colors.black})
+rmplane.GUI.inspectPanel.nameLabel = rmplane.GUI.inspectPanel:add("text",{x=1,y=1,h=1,w=14,text="",foreColour=colors.white,backColour=colors.black})
+rmplane.GUI.inspectPanel.descriptionLabel = rmplane.GUI.inspectPanel:add("text",{x=1,y=3,h=4,w=14,text="",foreColour=colors.white,backColour=colors.black})
+
+rmplane.GUI.playerPanel = cobalt.ui.new({x=3,y=17,w=30,h=2,backColour = colors.black})
+rmplane.GUI.playerPanel.carryingText = rmplane.GUI.playerPanel:add("text",{x=1,y=1,h=1,w=30,text="",foreColour=colors.orange,backColour=colors.black})
 
 local mapmaker = {}
 mapmaker.GUI = {}
 
 mapmaker.GUI.IDType = "tile"
-mapmaker.GUI.IDPanel = cobalt.ui.new({x=37,y=2,w=12,h=4,backColour = nil})
+mapmaker.GUI.IDPanel = cobalt.ui.new({x=37,y=2,w=12,h=5,backColour = nil})
 mapmaker.GUI.IDField = mapmaker.GUI.IDPanel:add("input",{w=12,h=1,y=1,placeholder="Tile ID"})
 mapmaker.GUI.IDTileButton = mapmaker.GUI.IDPanel:add("button",{w=12,h=1,y=2,text="Tile"})
 mapmaker.GUI.IDEntityButton = mapmaker.GUI.IDPanel:add("button",{w=12,h=1,y=3,text="Entity"})
 mapmaker.GUI.IDMetaDataField = mapmaker.GUI.IDPanel:add("input",{w=12,h=1,y=4,placeholder="Metadata"})
+mapmaker.GUI.IDDeleteButton = mapmaker.GUI.IDPanel:add("button",{w=12,h=1,y=5,text="DELETE",backColour=colors.red})
 
 mapmaker.GUI.IDTileButton.onclick = function()
 	mapmaker.GUI.IDType = "tile"
@@ -42,6 +48,11 @@ end
 mapmaker.GUI.IDEntityButton.onclick = function()
 	mapmaker.GUI.IDType = "entity"
 	mapmaker.GUI.IDField.placeholder = "Entity ID"
+end
+
+mapmaker.GUI.IDDeleteButton.onclick = function()
+	mapmaker.GUI.IDType = "delete"
+	mapmaker.GUI.IDField.placeholder = "..."
 end
 
 mapmaker.GUI.saveButtonPanel = cobalt.ui.new({x=1,y=19,w=6,h=1})
@@ -55,6 +66,10 @@ mapmaker.GUI.saveButton = mapmaker.GUI.saveButtonPanel:add("button",{text="Save"
 mapmaker.paint = {}
 mapmaker.paint.Selection = nil
 
+mapmaker.GUI.inspectPanel = cobalt.ui.new({x=37,y=8,w=12,h=3,backColour=colors.black})
+mapmaker.GUI.inspectPanelName = mapmaker.GUI.inspectPanel:add("text",{x=1,y=1,w=12,h=2,text="",foreColour=colors.white})
+mapmaker.GUI.inspectPanelMetaData = mapmaker.GUI.inspectPanel:add("text",{x=1,y=3,w=12,h=1,text="",foreColour=colors.white})
+
 if application ~= "mapmaker" then
 	for k,v in pairs(mapmaker.GUI) do
 		if v.x then v.x = -100 end
@@ -63,7 +78,7 @@ if application ~= "mapmaker" then
 end
 
 if application ~= "rmplane" then
-	for k,v in pairs(rmplaneGUI) do
+	for k,v in pairs(rmplane.GUI) do
 		if v.x then v.x = -100 end
 		if v.y then v.y = -100 end
 	end
@@ -78,6 +93,7 @@ local players = {
 			["bg"] = nil,
 			["fg"] = colors.white,
 		},
+		["carrying"] = nil,
 		["attributes"] = {
 			["strength"] = 6,
 			["endurance"] = 6,
@@ -308,13 +324,14 @@ local function saveMap(filePath,name,mapX,mapY)
 end
 
 mapmaker.GUI.saveButton.onclick = function()
-	saveMap(fs.getDir(shell.getRunningProgram()).."/maps/savedmap.rpmap","testmap",255,255)
+	saveMap(fs.getDir(shell.getRunningProgram()).."/maps/level1.rpmap","level1",255,255)
 end
 
 loadMap(fs.getDir(shell.getRunningProgram()).."/maps/level1.rpmap")
 
 local function determineVisibility(object1,object2)
-	local x1,y1 = object1.x,object1.y
+	return true
+	--[[local x1,y1 = object1.x,object1.y
 	local x2,y2 = object2.x,object2.y
 	
 	return bresenham.los(x1,y1,x2,y2,function(x,y)
@@ -322,8 +339,7 @@ local function determineVisibility(object1,object2)
 			return true
 		else
 			return false
-		end
-	end)
+		end]]--
 	--[[local a,b,c,A,B,C = 0,0,0,0,0,0
 	a = math.abs(object1.x - object2.x)
 	b = math.abs(object1.y - object2.y)
@@ -379,18 +395,46 @@ local function determineVisibility(object1,object2)
 	return true]]--
 end
 
+local function distanceOK(x1,y1,x2,y2)
+	if math.abs(x1-x2) <= 1 and math.abs(y1-y2) <= 1 then
+		return true
+	else
+		return false
+	end
+end
+
 function cobalt.update( dt )
 	tick = tick + dt
 	if tick >= tickRate then
 		tick = 0
+		totalTicks = totalTicks + 1
 		-- game update
+		for k,v in pairs(map.tileMap) do
+			for p,b in pairs(v) do
+				if b.scripts and b.scripts.onUpdate then
+					b.scripts.onUpdate(b,map.tileMap,map.entityMap,players)
+				end
+			end
+		end
 		
 		for k,v in pairs(map.entityMap) do
 			for p,b in pairs(v) do
+				if b.scripts and b.scripts.onUpdate then
+					b.scripts.onUpdate(b,map.tileMap,map.entityMap,players)
+				end
+				
 				if b.scripts and b.scripts.onSeePlayer and determineVisibility(b,players["localPlayer"]) then
 					b.scripts.onSeePlayer()
 				end
 			end
+		end
+		
+		if players["localPlayer"]["carrying"] then
+			rmplane.GUI.playerPanel.carryingText.text = "You're carrying a "..players["localPlayer"]["carrying"]["name"]
+			players["localPlayer"]["icon"]["fg"] = colors.orange
+		else
+			rmplane.GUI.playerPanel.carryingText.text = ""
+			players["localPlayer"]["icon"]["fg"] = colors.white
 		end
 	end
 	
@@ -479,30 +523,46 @@ function cobalt.mousepressed( x, y, button )
 	
 	if application == "mapmaker" then
 		if x > 0 and x <= camera.xSize and y > 0 and y <= camera.ySize then
-			if mapmaker.GUI.IDType == "tile" then
-				if tileTypes[tonumber(mapmaker.GUI.IDField.text)] then
-					if map.tileMap[lastMouse.x+lastMouse.cx] and map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] then
-						local object = map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy]
-						for k,v in pairs(tileTypes[tonumber(mapmaker.GUI.IDField.text)]) do
-							object[k] = v
-						end
-						object.x = lastMouse.x+lastMouse.cx
-						object.y = lastMouse.y+lastMouse.cy
-						object.type = tonumber(mapmaker.GUI.IDField.text) or 0
-						object.metaData = tonumber(mapmaker.GUI.IDMetaDataField.text) or 0
-					end
+			if button == 2 then
+				if map.entityMap[lastMouse.x+lastMouse.cx] and map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] and map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy].name then
+					mapmaker.GUI.inspectPanelName.text = map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy].name
+					mapmaker.GUI.inspectPanelMetaData.text = tostring(map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy].metaData) or "0"
+				elseif map.tileMap[lastMouse.x+lastMouse.cx] and map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] and map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy].name then
+					mapmaker.GUI.inspectPanelName.text = map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy].name
+					mapmaker.GUI.inspectPanelMetaData.text = tostring(map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy].metaData) or "0"
 				end
-			elseif mapmaker.GUI.IDType == "entity" then
-				if entityTypes[tonumber(mapmaker.GUI.IDField.text)] then
-					if map.entityMap[lastMouse.x+lastMouse.cx] and map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] then
-						local object = map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy]
-						for k,v in pairs(tileTypes[tonumber(mapmaker.GUI.IDField.text)]) do
-							object[k] = v
+			elseif button == 1 then
+				if mapmaker.GUI.IDType == "tile" then
+					if tileTypes[tonumber(mapmaker.GUI.IDField.text)] then
+						if map.tileMap[lastMouse.x+lastMouse.cx] and map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] then
+							local object = map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy]
+							for k,v in pairs(tileTypes[tonumber(mapmaker.GUI.IDField.text)]) do
+								object[k] = v
+							end
+							object.x = lastMouse.x+lastMouse.cx
+							object.y = lastMouse.y+lastMouse.cy
+							object.type = tonumber(mapmaker.GUI.IDField.text) or 0
+							object.metaData = tonumber(mapmaker.GUI.IDMetaDataField.text) or 0
 						end
-						object.x = lastMouse.x+lastMouse.cx
-						object.y = lastMouse.y+lastMouse.cy
-						object.type = tonumber(mapmaker.GUI.IDField.text) or 0
-						object.metaData = tonumber(mapmaker.GUI.IDMetaDataField.text) or 0
+					end
+				elseif mapmaker.GUI.IDType == "entity" then
+					if entityTypes[tonumber(mapmaker.GUI.IDField.text)] then
+						if map.entityMap[lastMouse.x+lastMouse.cx] and map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] then
+							local object = map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy]
+							for k,v in pairs(tileTypes[tonumber(mapmaker.GUI.IDField.text)]) do
+								object[k] = v
+							end
+							object.x = lastMouse.x+lastMouse.cx
+							object.y = lastMouse.y+lastMouse.cy
+							object.type = tonumber(mapmaker.GUI.IDField.text) or 0
+							object.metaData = tonumber(mapmaker.GUI.IDMetaDataField.text) or 0
+						end
+					end
+				elseif mapmaker.GUI.IDType == "delete" then
+					if map.entityMap[lastMouse.x+lastMouse.cx] and map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] and map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy].name then
+						map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] = {}
+					elseif map.tileMap[lastMouse.x+lastMouse.cx] and map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] and map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy].name then
+						map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] = {}
 					end
 				end
 			end
@@ -512,13 +572,44 @@ function cobalt.mousepressed( x, y, button )
 	if application == "rmplane" then
 		if x > 0 and x <= camera.xSize and y > 0 and y <= camera.ySize then
 			if map.entityMap[lastMouse.x+lastMouse.cx] and map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] and map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy].name then
-				local object = map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy]
-				rmplaneGUI.inspectPanel.nameLabel.text = object.name
-				rmplaneGUI.inspectPanel.descriptionLabel.text = object.description
+				if button == 2 then
+					local object = map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy]
+					rmplane.GUI.inspectPanel.nameLabel.text = object.name
+					rmplane.GUI.inspectPanel.descriptionLabel.text = object.description
+				elseif button == 1 then
+					if not players["localPlayer"]["carrying"] and distanceOK(players["localPlayer"]["x"],players["localPlayer"]["y"],lastMouse.x+lastMouse.cx,lastMouse.y+lastMouse.cy) then
+						players["localPlayer"]["carrying"] = {}
+						for k,v in pairs(map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy]) do
+							players["localPlayer"]["carrying"][k] = v
+						end
+						map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] = {}
+					end
+				end
+			elseif map.entityMap[lastMouse.x+lastMouse.cx] and map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] and map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy].name == nil and button == 1 and distanceOK(players["localPlayer"]["x"],players["localPlayer"]["y"],lastMouse.x+lastMouse.cx,lastMouse.y+lastMouse.cy) and players["localPlayer"]["carrying"] then
+				for k,v in pairs(players["localPlayer"]["carrying"]) do
+					map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy][k] = v
+				end
+				players["localPlayer"]["carrying"] = nil
+				
+				if map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy]["scripts"] and map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy]["scripts"]["onDrop"] then
+					local returnData = map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy]["scripts"]["onDrop"](map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy],lastMouse.x+lastMouse.cx,lastMouse.y+lastMouse.cy,map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy],map["tileMap"])
+					if returnData["tileMap"] then
+						for k,v in pairs(returnData["tileMap"]) do
+							map.tileMap[v.x][v.y] = v
+						end
+					end
+					if returnData["entityMap"] then
+						for k,v in pairs(returnData["entityMap"]) do
+							map.entityMap[v.x][v.y] = v
+						end
+					end
+				end
 			elseif map.tileMap[lastMouse.x+lastMouse.cx] and map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] and map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy].name then
-				local object = map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy]
-				rmplaneGUI.inspectPanel.nameLabel.text = object.name
-				rmplaneGUI.inspectPanel.descriptionLabel.text = object.description
+				if button == 2 then
+					local object = map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy]
+					rmplane.GUI.inspectPanel.nameLabel.text = object.name
+					rmplane.GUI.inspectPanel.descriptionLabel.text = object.description
+				end
 			end
 		end
 	end
