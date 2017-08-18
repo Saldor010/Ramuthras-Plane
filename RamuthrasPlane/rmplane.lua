@@ -1,8 +1,25 @@
 -- Ramuthra's Plane
 -- By Saldor010
-local version = "0.2_0" -- Not really updating this, lol
 local cobalt = dofile("cobalt")
 cobalt.ui = dofile("cobalt-ui/init.lua")
+
+local wave = dofile(shell.resolve(".").."/wave.lua")
+local context = wave.createContext()
+
+if commands then
+	context:addOutput(commands)
+else
+	term.setTextColor(colors.red)
+	print("If you would like to run Ramuthra's Plane with sound, please run it on a command computer. This message will go away in 2 seconds.")
+	sleep(2)
+end
+
+local soundEffects = {}
+local musicTracks = {}
+musicTracks.RamuthraLoop = wave.loadTrack(shell.resolve(".").."/RamuthraLoop.nbs")
+
+local musicInstance = {}
+local soundInstance = {}
 
 local args = {...}
 local application = args[1] or "rmplane"
@@ -438,6 +455,12 @@ function cobalt.update( dt )
 		end
 	end
 	
+	--[[if musicInstance.playing then
+		context:update(0.2)
+	else
+		musicInstance = context:addInstance(musicTracks.RamuthraLoop,1,true,true)
+	end]]
+	
 	cobalt.ui.update(dt)
 end
 
@@ -645,6 +668,44 @@ local function moveCamera(player,tx,ty)
 	camera.y = camera.y + ty
 end
 
+local function loopObjectsForMoveScript(plr) -- Yup, great function name
+	for k,v in pairs(map.tileMap) do
+		for p,b in pairs(v) do
+			if b.scripts and b.scripts.onPlayerMove then
+				local returnData = b.scripts.onPlayerMove(b,map.tileMap,map.entityMap,players,plr)
+				if returnData["tileMap"] then
+					for k,v in pairs(returnData["tileMap"]) do
+						map.tileMap[v.x][v.y] = v
+					end
+				end
+				if returnData["entityMap"] then
+					for k,v in pairs(returnData["entityMap"]) do
+						map.entityMap[v.x][v.y] = v
+					end
+				end
+			end
+		end
+	end
+	
+	for k,v in pairs(map.entityMap) do
+		for p,b in pairs(v) do
+			if b.scripts and b.scripts.onPlayerMove then
+				local returnData = b.scripts.onPlayerMove(b,map.tileMap,map.entityMap,players,plr)
+				if returnData["tileMap"] then
+					for k,v in pairs(returnData["tileMap"]) do
+						map.tileMap[v.x][v.y] = v
+					end
+				end
+				if returnData["entityMap"] then
+					for k,v in pairs(returnData["entityMap"]) do
+						map.entityMap[v.x][v.y] = v
+					end
+				end
+			end
+		end
+	end
+end
+
 function cobalt.keypressed( keycode, key )
 	if key == "left" or key == "up" or key == "right" or key == "down" then
 		local moveSuccess = false
@@ -658,6 +719,7 @@ function cobalt.keypressed( keycode, key )
 						player.x = player.x - 1
 						moveCamera(player,-1,0)
 						moveSuccess = true
+						loopObjectsForMoveScript(players["localPlayer"])
 					end
 				end
 			elseif key == "right" then
@@ -667,6 +729,7 @@ function cobalt.keypressed( keycode, key )
 						player.x = player.x + 1
 						moveCamera(player,1,0)
 						moveSuccess = true
+						loopObjectsForMoveScript(players["localPlayer"])
 					end
 				end
 			elseif key == "up" then
@@ -676,6 +739,7 @@ function cobalt.keypressed( keycode, key )
 						player.y = player.y - 1
 						moveCamera(player,0,-1)
 						moveSuccess = true
+						loopObjectsForMoveScript(players["localPlayer"])
 					end
 				end
 			elseif key == "down" then
@@ -685,6 +749,7 @@ function cobalt.keypressed( keycode, key )
 						player.y = player.y + 1
 						moveCamera(player,0,1)
 						moveSuccess = true
+						loopObjectsForMoveScript(players["localPlayer"])
 					end
 				end
 			end

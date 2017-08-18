@@ -161,9 +161,14 @@ local tileTypes = {
 			["onLoad"] = function(tile,tx,ty,localArgs)
 				local returnText = ""
 				local returnData = {
-					[0] = "Feast prepered!",
-					[1] = "Hummans welkome!",
-					[2] = "Your a verry special gest!",
+					[0] = "Congrats!",
+					[1] = "You beat the game!",
+					[2] = "Not that it's much of an achievement,",
+					[3] = "considering the game only has 4 levels.",
+					[4] = "Hopefully this will help show the potential",
+					[5] = "for this game though, and what kind of",
+					[6] = "levels can be made!",
+					[7] = "P.S. please vote for me to win CCJam17 .u.",
 				}
 				
 				if returnData[tile.metaData] then
@@ -184,6 +189,7 @@ local tileTypes = {
 		},
 		["passable"] = false,
 		["transparent"] = false,
+		["scripts"] = {},
 	},
 	[5] = {
 		["name"] = "Keyhole",
@@ -195,6 +201,7 @@ local tileTypes = {
 		},
 		["passable"] = false,
 		["transparent"] = false,
+		["scripts"] = {},
 	},
 	[6] = {
 		["name"] = "Pressure Pad",
@@ -208,7 +215,19 @@ local tileTypes = {
 		["transparent"] = true,
 		["scripts"] = {},
 		["activated"] = false,
-	}
+	},
+	--[[[7] = {
+		["name"] = "Pressure Pad",
+		["description"] = "Standing on it, or placing an object on it, might cause a reaction.",
+		["icon"] = {
+			["text"] = "+",
+			["bg"] = colors.darkGrey,
+			["fg"] = colors.grey,
+		},
+		["passable"] = true,
+		["transparent"] = true,
+		["scripts"] = {},
+	},]]--
 }
 
 local entityTypes = {
@@ -289,6 +308,48 @@ for k,v in pairs(tileTypes) do
 	for p,b in pairs(v) do
 		newTileTypes[k][p] = b
 	end
+end
+
+tileTypes[4]["scripts"]["onPlayerMove"] = function(object,tileMap,entityMap,players,playerThatMoved)
+	local returnData = {}
+	returnData["tileMap"] = {}
+	
+	if playerThatMoved.y+3 < object.y then
+		local returnTile = object
+		returnTile["passable"] = false
+		returnTile["transparent"] = false
+		returnTile["icon"] = {
+			["text"] = "=",
+			["bg"] = colors.brown,
+			["fg"] = colors.grey,
+		}
+		returnTile["name"] = "Locked Gate"
+		returnTile["description"] = "A tall, wooden gate criss crossed by steel bars."
+		table.insert(returnData.tileMap,returnTile)
+	end
+	
+	return returnData
+end
+
+tileTypes[5]["scripts"]["onPlayerMove"] = function(object,tileMap,entityMap,players,playerThatMoved)
+	local returnData = {}
+	returnData["tileMap"] = {}
+	
+	if playerThatMoved.y+3 < object.y then
+		local returnTile = object
+		returnTile["passable"] = false
+		returnTile["transparent"] = false
+		returnTile["icon"] = {
+			["text"] = "=",
+			["bg"] = colors.brown,
+			["fg"] = colors.grey,
+		}
+		returnTile["name"] = "Locked Gate"
+		returnTile["description"] = "A tall, wooden gate criss crossed by steel bars."
+		table.insert(returnData.tileMap,returnTile)
+	end
+	
+	return returnData
 end
 
 tileTypes[6]["scripts"]["onUpdate"] = function(object,tileMap,entityMap,players)
