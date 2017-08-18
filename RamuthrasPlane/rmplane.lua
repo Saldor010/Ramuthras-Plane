@@ -3,21 +3,6 @@
 local cobalt = dofile("cobalt")
 cobalt.ui = dofile("cobalt-ui/init.lua")
 
-local wave = dofile(shell.resolve(".").."/wave.lua")
-local context = wave.createContext()
-
-if commands then
-	context:addOutput(commands)
-else
-	term.setTextColor(colors.red)
-	print("If you would like to run Ramuthra's Plane with sound, please run it on a command computer. This message will go away in 2 seconds.")
-	sleep(2)
-end
-
-local soundEffects = {}
-local musicTracks = {}
-musicTracks.RamuthraLoop = wave.loadTrack(shell.resolve(".").."/RamuthraLoop.nbs")
-
 local musicInstance = {}
 local soundInstance = {}
 
@@ -33,9 +18,6 @@ lastMouse.x = 0
 lastMouse.y = 0
 lastMouse.cx = 0
 lastMouse.cy = 0
-
-local bresenham = dofile(shell.resolve(".").."/bresenham.lua")
---local aStar = dofile(shell.resolve(".").."/astar.lua")
 
 local rmplane = {}
 rmplane.GUI = {}

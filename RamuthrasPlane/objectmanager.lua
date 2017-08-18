@@ -216,18 +216,30 @@ local tileTypes = {
 		["scripts"] = {},
 		["activated"] = false,
 	},
-	--[[[7] = {
-		["name"] = "Pressure Pad",
-		["description"] = "Standing on it, or placing an object on it, might cause a reaction.",
+	[7] = {
+		["name"] = "Lever Up",
+		["description"] = "A wooden lever imbedded in stone. You might be able to toggle it.",
 		["icon"] = {
-			["text"] = "+",
+			["text"] = "\\",
 			["bg"] = colors.darkGrey,
-			["fg"] = colors.grey,
+			["fg"] = colors.brown,
 		},
-		["passable"] = true,
-		["transparent"] = true,
+		["passable"] = false,
+		["transparent"] = false,
 		["scripts"] = {},
-	},]]--
+	},
+	[8] = {
+		["name"] = "Lever Down",
+		["description"] = "A wooden lever imbedded in stone. You might be able to toggle it.",
+		["icon"] = {
+			["text"] = "/",
+			["bg"] = colors.darkGrey,
+			["fg"] = colors.brown,
+		},
+		["passable"] = false,
+		["transparent"] = false,
+		["scripts"] = {},
+	},
 }
 
 local entityTypes = {
@@ -395,6 +407,10 @@ tileTypes[6]["scripts"]["onUpdate"] = function(object,tileMap,entityMap,players)
 	end
 	 
 	 return returnData
+end
+
+tileTypes[7]["scripts"]["onMouseClick"] = function(object,tileMap,entityMap,players,button)
+	
 end
 
 entityTypes[1]["scripts"]["onDrop"] = function(object,newX,newY,newTile,tileMap)
