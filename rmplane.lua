@@ -160,7 +160,7 @@ local function findTile(x,y)
 	return tile,entity
 end
 
-local objectManager = dofile(shell.resolve(".").."/objectmanager.lua")
+local objectManager = dofile(fs.getDir(shell.getRunningProgram()).."/objectmanager.lua")
 tileTypes = objectManager.loadTileTypes()
 entityTypes = objectManager.loadEntityTypes()
 factions = objectManager.loadFactions()
