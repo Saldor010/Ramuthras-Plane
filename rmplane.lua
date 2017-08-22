@@ -1,7 +1,7 @@
 -- Ramuthra's Plane
 -- By Saldor010
-local cobalt = dofile(fs.getDir(shell.getRunningProgram()).."/cobalt")
-cobalt.ui = dofile(fs.getDir(shell.getRunningProgram()).."/cobalt-ui/init.lua")
+local cobalt = dofile("cobalt")
+cobalt.ui = dofile("cobalt-ui/init.lua")
 
 local musicInstance = {}
 local soundInstance = {}
@@ -160,7 +160,7 @@ local function findTile(x,y)
 	return tile,entity
 end
 
-local objectManager = dofile(fs.getDir(shell.getRunningProgram()).."/objectmanager.lua")
+local objectManager = dofile(shell.resolve(".").."/objectmanager.lua")
 tileTypes = objectManager.loadTileTypes()
 entityTypes = objectManager.loadEntityTypes()
 factions = objectManager.loadFactions()
