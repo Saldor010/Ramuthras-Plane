@@ -16,6 +16,10 @@ This will install all game files (excluding cobalt) to "/RamuthrasPlane". If you
 
 *pastebin run AnAVtXCy file/path/here*
 
+**If you recieve an error message that suggests that you've hit the GitHub rate limit, you can pass an OAuth token as the second argument to the installer in order to authorize yourself and recieve a higher rate limit, which should allow you to complete the installation.** To create an OAuth token, sign into GitHub and visit this link: https://github.com/settings/tokens
+
+*pastebin run AnAVtXCy file/path/here token*
+
 
 ### Links
 Computercraft forums (CCJam2017 thread) - http://www.computercraft.info/forums2/index.php?/topic/28890-ccjam-2017-is-here/
