@@ -4,17 +4,17 @@ This is the up to date version of Ramuthra's Plane. If you would like to see the
 The RPG game that ended up turning into a puzzle adventure game halfway through development. Written by Saldor010 during CCJam2017.
 
 ### Download
-You can download the installer from the following pastebin link: https://pastebin.com/FMxzqCrB
+You can download the installer from the following pastebin link: https://pastebin.com/AnAVtXCy
 
 The installer will grab all of the files necessary from this repository and put them in their proper places.
 
 You can run the installer in the Computercraft shell by running this command: 
 
-*pastebin run FMxzqCrB*
+*pastebin run AnAVtXCy*
 
 This will install all game files (excluding cobalt) to "/RamuthrasPlane". If you would like to install Ramuthra's Plane to a specific file path, run this command:
 
-*pastebin run FMxzqCrB file/path/here*
+*pastebin run AnAVtXCy file/path/here*
 
 
 ### Links
