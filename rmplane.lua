@@ -19,25 +19,105 @@ lastMouse.y = 0
 lastMouse.cx = 0
 lastMouse.cy = 0
 
+local levels = {
+	[1] = "level1.rpmap",
+}
+local currentLevel = nil
+
+cobalt.state = "intro"
+if application == "mapmaker" then
+	cobalt.state = "game"
+end
+
+local introColor = colors.blue
+local introColor2 = colors.white
+
+local currentIntroStory = 1
+local introStory = {
+	[1] = {
+		["text"] = "It was a quiet, peaceful morning when the world changed forever. There were crowds bustling in the market place, farmers tilling their fields, and evil creatures lurking far below the ground away from the good people above. All of the sudden, the sky turned from a pale blue to a dark, demonic red. Thunder cracked in the distance, and the earth shook with the might of a thousand horses. Children began to cry as their mothers hurried them away to safety. Then, the dark presence revealed himself:",
+		["color"] = colors.yellow,
+		["foreColour"] = colors.black,
+	},
+	[2] = {
+		["text"] = "Ramuthra, a demon of unparalleled power, tearing asunder the fabric of this plane of existence itself as he landed heavily onto the city square. He surrounded himself with an undecipherable black cloud, that seemed to have neither an ending nor a beginning as to where it existed. The only thing visible within the cloud, were his glowing red eyes, of which he had six. He set fire to the city just by gazing upon it.",
+		["color"] = colors.orange,
+		["foreColour"] = colors.black,
+	},
+	[3] = {
+		["text"] = "Then, as quickly as the chaos had started, it ceased. All noise was removed, all fires put out. The people tried to scream, but found that their voice was missing. The earth stopped shaking, though the cracks in the earth remained. The only being that made noise, was Ramuthra, as he spoke from within the dark cloud.",
+		["color"] = colors.gray,
+		["foreColour"] = colors.white,
+	},
+	[4] = {
+		["text"] = [["Ahh, this pleases me. But it is not fair, you can do nothing to avoid my wrath." As he spoke these words, a misty blue portal emerged from the charred surface of what was left of the city square. "I present a challenge to you, mortals. This portal will lead you to my plane of existence, containing three crystals that I would like collected. Your people have 24 hours of this planet's time to retrieve the crystals. If you return in time, I will leave this plane and never return. If you do not return in time, I will destroy this plane and everyone inhabiting it."]],
+		["color"] = colors.red,
+		["foreColour"] = colors.white,
+	},
+	[5] = {
+		["text"] = [[Ramuthra then went silent, and receded deep within his cloud of evil, his eyes submerging themselves within it. Although he removed the spell restricting the noise of the people, no one spoke. The only noise in the city was the soft crying of infants, being held tight by their mothers. Slowly, very slowly, a man stepped forward and approached the shimmering blue portal. Soon, other men followed, realizing the alternative.]],
+		["color"] = colors.green,
+		["foreColour"] = colors.white,
+	},
+	[6] = {
+		["text"] = [[You were one of these men. As you stepped through the portal, you felt the sensation of being drenched in cold water, then an overwhelming suffocation. Your eyes bulged, your limbs stiffened, then with a sudden rush, you remembered how to breathe. Your lungs filled with crisp, cold air, then exhaled. As you opened your eyes and looked around you saw a door up ahead, and took your first step in RAMUTHRA'S PLANE.]],
+		["color"] = colors.blue,
+		["foreColour"] = colors.white,
+	},
+}
+
+local wD,hT = term.getSize()
+local introGUI = {}
+introGUI.Panel = cobalt.ui.new({x=1,y=1,w=wD,h=hT,backColour=colors.black,state="intro"})
+introGUI.SkipIntro = introGUI.Panel:add("button",{w=16,h=1,y=hT-1,wrap="center",text="Skip Intro",foreColour=colors.black,backColour=introColor,state="intro"})
+introGUI.Continue = introGUI.Panel:add("button",{w=16,h=1,y=hT-3,wrap="center",text="Continue",foreColour=colors.black,backColour=introColor,state="intro"})
+introGUI.SideBarLeft = introGUI.Panel:add("text",{w=2,h=hT,y=0,x=0,text=string.rep("@@ ",200),backColour=colors.black,foreColour=introColor,state="intro"})
+introGUI.SideBarRight = introGUI.Panel:add("text",{w=2,h=hT,y=0,x=wD-2,text=string.rep("@@ ",200),backColour=colors.black,foreColour=introColor,state="intro"})
+introGUI.Story = introGUI.Panel:add("text",{w=wD-4,h=hT-2,y=2,x=3,text=" ",backColour=colors.black,foreColour=introColor,state="intro"})
+
+introGUI.SkipIntro.onclick = function()
+	cobalt.state = "paused"
+end
+
+introGUI.Continue.onclick = function()
+	introGUI.Story.text = " "
+	introGUI.Story.unformatted = " "
+	currentIntroStory = currentIntroStory + 1
+	if introStory[currentIntroStory] then else
+		currentIntroStory = 1
+		cobalt.state = "paused"
+	end
+end
+
+local function refreshIntroGUI()
+	introGUI.SkipIntro.backColour = introColor
+	introGUI.Continue.backColour = introColor
+	introGUI.SkipIntro.foreColour = introColor2
+	introGUI.Continue.foreColour = introColor2
+	introGUI.SideBarLeft.foreColour = introColor
+	introGUI.SideBarRight.foreColour = introColor
+	introGUI.Story.foreColour = introColor
+end
+
 local rmplane = {}
 rmplane.GUI = {}
-rmplane.GUI.inspectPanel = cobalt.ui.new({x=37,y=2,w=14,h=12,backColour=colors.black})
-rmplane.GUI.inspectPanel.nameLabel = rmplane.GUI.inspectPanel:add("text",{x=1,y=1,h=1,w=14,text="",foreColour=colors.white,backColour=colors.black})
-rmplane.GUI.inspectPanel.descriptionLabel = rmplane.GUI.inspectPanel:add("text",{x=1,y=3,h=4,w=14,text="",foreColour=colors.white,backColour=colors.black})
+rmplane.GUI.inspectPanel = cobalt.ui.new({x=37,y=2,w=14,h=12,backColour=colors.black,state="game"})
+rmplane.GUI.inspectPanel.nameLabel = rmplane.GUI.inspectPanel:add("text",{x=1,y=1,h=1,w=14,text="",foreColour=colors.white,backColour=colors.black,state="game"})
+rmplane.GUI.inspectPanel.descriptionLabel = rmplane.GUI.inspectPanel:add("text",{x=1,y=3,h=4,w=14,text="",foreColour=colors.white,backColour=colors.black,state="game"})
 
-rmplane.GUI.playerPanel = cobalt.ui.new({x=3,y=17,w=30,h=2,backColour = colors.black})
-rmplane.GUI.playerPanel.carryingText = rmplane.GUI.playerPanel:add("text",{x=1,y=1,h=1,w=30,text="",foreColour=colors.orange,backColour=colors.black})
+rmplane.GUI.playerPanel = cobalt.ui.new({x=3,y=17,w=30,h=2,backColour = colors.black,state="game"})
+rmplane.GUI.playerPanel.carryingText = rmplane.GUI.playerPanel:add("text",{x=1,y=1,h=1,w=30,text="",foreColour=colors.orange,backColour=colors.black,state="game"})
 
 local mapmaker = {}
 mapmaker.GUI = {}
 
 mapmaker.GUI.IDType = "tile"
-mapmaker.GUI.IDPanel = cobalt.ui.new({x=37,y=2,w=12,h=5,backColour = nil})
-mapmaker.GUI.IDField = mapmaker.GUI.IDPanel:add("input",{w=12,h=1,y=1,placeholder="Tile ID"})
-mapmaker.GUI.IDTileButton = mapmaker.GUI.IDPanel:add("button",{w=12,h=1,y=2,text="Tile"})
-mapmaker.GUI.IDEntityButton = mapmaker.GUI.IDPanel:add("button",{w=12,h=1,y=3,text="Entity"})
-mapmaker.GUI.IDMetaDataField = mapmaker.GUI.IDPanel:add("input",{w=12,h=1,y=4,placeholder="Metadata"})
-mapmaker.GUI.IDDeleteButton = mapmaker.GUI.IDPanel:add("button",{w=12,h=1,y=5,text="DELETE",backColour=colors.red})
+mapmaker.GUI.IDPanel = cobalt.ui.new({x=37,y=2,w=12,h=5,backColour = nil,state="game"})
+mapmaker.GUI.IDField = mapmaker.GUI.IDPanel:add("input",{w=12,h=1,y=1,placeholder="Tile ID",state="game"})
+mapmaker.GUI.IDTileButton = mapmaker.GUI.IDPanel:add("button",{w=12,h=1,y=2,text="Tile",state="game"})
+mapmaker.GUI.IDEntityButton = mapmaker.GUI.IDPanel:add("button",{w=12,h=1,y=3,text="Entity",state="game",state="game"})
+mapmaker.GUI.IDMetaDataField = mapmaker.GUI.IDPanel:add("input",{w=12,h=1,y=4,placeholder="Metadata",state="game"})
+mapmaker.GUI.IDDeleteButton = mapmaker.GUI.IDPanel:add("button",{w=12,h=1,y=5,text="DELETE",backColour=colors.red,state="game"})
 
 mapmaker.GUI.IDTileButton.onclick = function()
 	mapmaker.GUI.IDType = "tile"
@@ -54,8 +134,8 @@ mapmaker.GUI.IDDeleteButton.onclick = function()
 	mapmaker.GUI.IDField.placeholder = "..."
 end
 
-mapmaker.GUI.saveButtonPanel = cobalt.ui.new({x=1,y=19,w=6,h=1})
-mapmaker.GUI.saveButton = mapmaker.GUI.saveButtonPanel:add("button",{text="Save",w=6,h=1})
+mapmaker.GUI.saveButtonPanel = cobalt.ui.new({x=1,y=19,w=6,h=1,state="game"})
+mapmaker.GUI.saveButton = mapmaker.GUI.saveButtonPanel:add("button",{text="Save",w=6,h=1,state="game"})
 
 --mapmaker.GUI.savePrompt = cobalt.ui.new({x="25%",y="25%",w="50%",h="50%",backColour = colors.cyan})
 --mapmaker.GUI.savePromptText = mapmaker.GUI.savePrompt:add("text",{x="25%",y="25%",w="50%",h="25%"})
@@ -65,9 +145,78 @@ mapmaker.GUI.saveButton = mapmaker.GUI.saveButtonPanel:add("button",{text="Save"
 mapmaker.paint = {}
 mapmaker.paint.Selection = nil
 
-mapmaker.GUI.inspectPanel = cobalt.ui.new({x=37,y=8,w=12,h=3,backColour=colors.black})
-mapmaker.GUI.inspectPanelName = mapmaker.GUI.inspectPanel:add("text",{x=1,y=1,w=12,h=2,text="",foreColour=colors.white})
-mapmaker.GUI.inspectPanelMetaData = mapmaker.GUI.inspectPanel:add("text",{x=1,y=3,w=12,h=1,text="",foreColour=colors.white})
+mapmaker.GUI.inspectPanel = cobalt.ui.new({x=37,y=8,w=12,h=3,backColour=colors.black,state="game"})
+mapmaker.GUI.inspectPanelName = mapmaker.GUI.inspectPanel:add("text",{x=1,y=1,w=12,h=2,text="",foreColour=colors.white,state="game"})
+mapmaker.GUI.inspectPanelMetaData = mapmaker.GUI.inspectPanel:add("text",{x=1,y=3,w=12,h=1,text="",foreColour=colors.white,state="game"})
+
+local mainMenuColor = colors.red
+
+local mainMenuGUI = {}
+mainMenuGUI.Panel = cobalt.ui.new({x=1,y=1,w=wD,h=hT,backColour = colors.black,state="paused"})
+mainMenuGUI.ExitGameButton = mainMenuGUI.Panel:add("button",{w=16,h=1,y=15,wrap="center",text="Exit Game",backColour=mainMenuColor,state="paused"})
+mainMenuGUI.ResumeGameButton = mainMenuGUI.Panel:add("button",{w=16,h=1,y=13,wrap="center",text="Resume Game",backColour=colors.gray,state="paused",enabled=false})
+mainMenuGUI.PlayIntroButton = mainMenuGUI.Panel:add("button",{w=16,h=1,y=11,wrap="center",text="Replay Intro",backColour=mainMenuColor,state="paused",enabled=true})
+mainMenuGUI.NewGameButton = mainMenuGUI.Panel:add("button",{w=16,h=1,y=9,wrap="center",text="New Game",backColour=mainMenuColor,state="paused"})
+mainMenuGUI.Title = mainMenuGUI.Panel:add("text",{w=wD,h=4,y=2,x=1,wrap="center",text="R A M U T H R A ' S",backColour=colors.black,foreColour=mainMenuColor,state="paused"})
+mainMenuGUI.Title2 = mainMenuGUI.Panel:add("text",{w=wD,h=4,y=4,x=1,wrap="center",text="P L A N E",backColour=colors.black,foreColour=cobalt.g.lighten(mainMenuColor),state="paused"})
+
+mainMenuGUI.ExitGameButton.onclick = function()
+	cobalt.exit()
+end
+
+mainMenuGUI.ResumeGameButton.onclick = function()
+	cobalt.state = "game"
+end
+
+mainMenuGUI.PlayIntroButton.onclick = function()
+	introGUI.Story.text = " "
+	introGUI.Story.unformatted = " "
+	currentIntroStory = 1
+	cobalt.state = "intro"
+end
+
+local players = {}
+
+local levelGUI = {}
+levelGUI.Panel = cobalt.ui.new({x=1,y=1,w=wD,h=hT,backColour = colors.black,state="levels"})
+for i=1,3 do
+	for j=1,3 do
+		local C = colors.red
+		if j == 2 then C = colors.green elseif j == 3 then C = colors.blue end
+		--[[local a = ((j-1)*3)+i
+		if a > players["localPlayer"]["farthestLevelUnlocked"] then
+			C = cobalt.g.darken(C)
+		end]]--
+		levelGUI[i.."/"..j] = levelGUI.Panel:add("button",{w=4,h=2,y=-1+(j*4),x=10+(i*7),text=j.."-"..i,backColour=C,state="levels"})
+	end
+end
+levelGUI.BackButton = levelGUI.Panel:add("button",{w=20,h=1,y=17,wrap="center",text="Back to Main Menu",backColour=mainMenuColor,state="levels"})
+
+levelGUI.BackButton.onclick = function()
+	cobalt.state = "paused"
+end
+
+mainMenuGUI.NewGameButton.onclick = function()
+	cobalt.state = "levels"
+	for i=1,3 do
+		for j=1,3 do
+			local C = colors.red
+			if j == 2 then C = colors.green elseif j == 3 then C = colors.blue end
+			local a = ((j-1)*3)+i
+			if a > players["localPlayer"]["farthestLevelUnlocked"] then
+				C = colors.gray
+				levelGUI[i.."/"..j]["enabled"] = false
+			elseif levels[a] then
+				levelGUI[i.."/"..j]["enabled"] = true
+			else
+				C = colors.lightGray
+				levelGUI[i.."/"..j]["enabled"] = false
+			end
+			--error(levelGUI[i.."/"..j])
+			levelGUI[i.."/"..j]["backColour"] = C
+		end
+	end
+end
 
 if application ~= "mapmaker" then
 	for k,v in pairs(mapmaker.GUI) do
@@ -83,10 +232,14 @@ if application ~= "rmplane" then
 	end
 end
 
-local players = {
+players = {
 	["localPlayer"] = {
+		["farthestLevelUnlocked"] = 1,
+		["finishedLevel"] = false,
 		["x"] = 5,
 		["y"] = 5,
+		["ghost"] = false,
+		["frozen"] = false,
 		["icon"] = {
 			["text"] = "@",
 			["bg"] = nil,
@@ -139,6 +292,7 @@ local map = {
 	["tileMapMemory"] = {},
 	["entityMap"] = {},
 	["entityMapMemory"] = {},
+	["binds"] = {},
 }
 
 local camera = {
@@ -147,6 +301,8 @@ local camera = {
 	["xSize"] = 35,
 	["ySize"] = 15,
 }
+
+local lastTick = os.time()
 
 local function findTile(x,y)
 	local tile = false
@@ -167,10 +323,6 @@ factions = objectManager.loadFactions()
 
 for k,v in pairs(players) do
 	v.faction = factions.champions
-end
-
-if application == "mapmaker" then
-	
 end
 
 local function loadMap(file)
@@ -232,6 +384,11 @@ local function loadMap(file)
 			end
 		end
 		map = loadedMap
+		map["scriptBinds"] = {
+			["onPlayerMove"] = {},
+			["onUpdate"] = {},
+			["onDraw"] = {},
+		}
 		
 		for i=1,map.xSize do
 			for j=1,map.ySize do
@@ -239,7 +396,7 @@ local function loadMap(file)
 					if map["tileMap"][i][j].scripts and map["tileMap"][i][j].scripts.onLoad then
 						local localArgs = map["tileMap"][i][j].scripts.onLoad(map["tileMap"][i][j],i,j,{
 							["players"] = players,
-						})
+						},map)
 						
 						if localArgs and localArgs["object"] then
 							for k,v in pairs(localArgs["object"]) do
@@ -247,18 +404,36 @@ local function loadMap(file)
 							end
 						end
 					end
+					if map["tileMap"][i][j].scripts and map["tileMap"][i][j].scripts.onPlayerMove then
+						table.insert(map["scriptBinds"]["onPlayerMove"],map["tileMap"][i][j])
+					end
+					if map["tileMap"][i][j].scripts and map["tileMap"][i][j].scripts.onUpdate then
+						table.insert(map["scriptBinds"]["onUpdate"],map["tileMap"][i][j])
+					end
+					if map["tileMap"][i][j].scripts and map["tileMap"][i][j].scripts.onDraw then
+						table.insert(map["scriptBinds"]["onDraw"],map["tileMap"][i][j])
+					end
 				end
 				if map["entityMap"][i][j] then
 					if map["entityMap"][i][j].scripts and map["entityMap"][i][j].scripts.onLoad then
 						local localArgs = map["entityMap"][i][j].scripts.onLoad(map["entityMap"][i][j],i,j,{
 							["players"] = players,
-						})
+						},map)
 						
 						if localArgs and localArgs["object"] then
 							for k,v in pairs(localArgs["object"]) do
 								map["entityMap"][i][j][k] = v
 							end
 						end
+					end
+					if map["entityMap"][i][j].scripts and map["entityMap"][i][j].scripts.onPlayerMove then
+						table.insert(map["scriptBinds"]["onPlayerMove"],map["entityMap"][i][j])
+					end
+					if map["entityMap"][i][j].scripts and map["entityMap"][i][j].scripts.onUpdate then
+						table.insert(map["scriptBinds"]["onUpdate"],map["entityMap"][i][j])
+					end
+					if map["entityMap"][i][j].scripts and map["entityMap"][i][j].scripts.onDraw then
+						table.insert(map["scriptBinds"]["onDraw"],map["entityMap"][i][j])
 					end
 				end
 			end
@@ -272,7 +447,7 @@ local function loadMap(file)
 		--while camera.x < 0 do camera.x = camera.x + 1 end
 		--while camera.y < 0 do camera.y = camera.y + 1 end
 	else
-		error("No map exists")
+		error("No such map "..file.." exists")
 	end
 end
 
@@ -322,11 +497,36 @@ local function saveMap(filePath,name,mapX,mapY)
 	--end
 end
 
-mapmaker.GUI.saveButton.onclick = function()
-	saveMap(fs.getDir(shell.getRunningProgram()).."/maps/level1.rpmap","level1",255,255)
+function loadLevel(level)
+	if fs.getDir(shell.getRunningProgram()).."/maps/"..levels[level] then
+		currentLevel = level
+		loadMap(fs.getDir(shell.getRunningProgram()).."/maps/"..levels[level])
+		cobalt.state = "game"
+		if level >= 7 then mainMenuColor = colors.blue elseif level >= 4 then mainMenuColor = colors.green else mainMenuColor = colors.red end
+		mainMenuGUI.ResumeGameButton.backColour = mainMenuColor
+		mainMenuGUI.ResumeGameButton.enabled = true
+	else
+		error("Level does not exist! "..level..", "..levels[level])
+	end
 end
 
-loadMap(fs.getDir(shell.getRunningProgram()).."/maps/level1.rpmap")
+for i=1,3 do
+	for j=1,3 do
+		levelGUI[i.."/"..j].onclick = function()
+			loadLevel(((j-1)*3)+i)
+		end
+	end
+end
+
+if application == "mapmaker" and fs.exists(fs.getDir(shell.getRunningProgram()).."/maps/workingmap.rpmap") then
+	loadMap(fs.getDir(shell.getRunningProgram()).."/maps/workingmap.rpmap")
+end
+
+mapmaker.GUI.saveButton.onclick = function()
+	saveMap(fs.getDir(shell.getRunningProgram()).."/maps/workingmap.rpmap","workingmap",255,255)
+end
+
+--loadMap(fs.getDir(shell.getRunningProgram()).."/maps/level1.rpmap")
 
 local function determineVisibility(object1,object2)
 	return true
@@ -404,11 +604,11 @@ end
 
 function cobalt.update( dt )
 	tick = tick + dt
-	if tick >= tickRate then
+	if map and tick >= tickRate then
 		tick = 0
 		totalTicks = totalTicks + 1
 		-- game update
-		for k,v in pairs(map.tileMap) do
+		--[[for k,v in pairs(map.tileMap) do
 			for p,b in pairs(v) do
 				if b.scripts and b.scripts.onUpdate then
 					b.scripts.onUpdate(b,map.tileMap,map.entityMap,players)
@@ -426,14 +626,36 @@ function cobalt.update( dt )
 					b.scripts.onSeePlayer()
 				end
 			end
+		end]]--
+		--error(#map.scriptBinds.onUpdate)
+		if map.scriptBinds and map.scriptBinds.onUpdate then
+			for k,v in pairs(map.scriptBinds.onUpdate) do
+				if v and v.scripts and v.scripts.onUpdate then
+					v.scripts.onUpdate(v,map,players)
+				end
+			end
 		end
 		
-		if players["localPlayer"]["carrying"] then
-			rmplane.GUI.playerPanel.carryingText.text = "You're carrying a "..players["localPlayer"]["carrying"]["name"]
-			players["localPlayer"]["icon"]["fg"] = colors.orange
+		if players["localPlayer"]["finishedLevel"] == true then
+			if players["localPlayer"]["farthestLevelUnlocked"] == currentLevel then
+				players["localPlayer"]["farthestLevelUnlocked"] = players["localPlayer"]["farthestLevelUnlocked"] + 1
+				if players["localPlayer"]["farthestLevelUnlocked"] > 9 then players["localPlayer"]["farthestLevelUnlocked"] = 9 end
+			end
+			players["localPlayer"]["icon"]["text"] = ""
+			players["localPlayer"]["frozen"] = true
+			rmplane.GUI.playerPanel.carryingText.text = "Level complete! Press ENTER to continue or CTRL to leave."
 		else
-			rmplane.GUI.playerPanel.carryingText.text = ""
-			players["localPlayer"]["icon"]["fg"] = colors.white
+			if players["localPlayer"]["carrying"] then
+				rmplane.GUI.playerPanel.carryingText.text = "You're carrying a "..players["localPlayer"]["carrying"]["name"]
+				players["localPlayer"]["icon"]["fg"] = colors.orange
+			else
+				rmplane.GUI.playerPanel.carryingText.text = ""
+				if players["localPlayer"]["ghost"] then
+					players["localPlayer"]["icon"]["fg"] = colors.purple
+				else
+					players["localPlayer"]["icon"]["fg"] = colors.white
+				end
+			end
 		end
 	end
 	
@@ -447,77 +669,112 @@ function cobalt.update( dt )
 end
 
 function cobalt.draw()
-	for i=1,19 do
-		cobalt.graphics.print(string.rep("/",51),1,i,colors.black,colors.gray)
-	end
-	for i=camera.x,camera.x+camera.xSize do
-		for j=camera.y,camera.y+camera.ySize do
-			if map["tileMap"][i] and map["tileMap"][i][j] and map["tileMap"][i][j]["icon"] then
-				if not map["tileMap"][i][j].x then map["tileMap"][i][j].x = i end
-				if not map["tileMap"][i][j].y then map["tileMap"][i][j].y = j end
-				if determineVisibility(players.localPlayer,map["tileMap"][i][j]) or application == "mapmaker" then
-					cobalt.graphics.print(map["tileMap"][i][j]["icon"]["text"],i-camera.x,j-camera.y,map["tileMap"][i][j]["icon"]["bg"],map["tileMap"][i][j]["icon"]["fg"])
-					
-					map["tileMapMemory"][i][j] = {}
-					map["tileMapMemory"][i][j].icon = {} 
-					map["tileMapMemory"][i][j].icon.text = map["tileMap"][i][j].icon.text
-					map["tileMapMemory"][i][j].icon.fg = map["tileMap"][i][j].icon.fg
-					map["tileMapMemory"][i][j].icon.bg = map["tileMap"][i][j].icon.bg
-				elseif map["tileMapMemory"][i][j] then
-					cobalt.graphics.print(map["tileMapMemory"][i][j]["icon"]["text"],i-camera.x,j-camera.y,cobalt.graphics.darken(map["tileMapMemory"][i][j]["icon"]["bg"]),cobalt.graphics.darken(map["tileMapMemory"][i][j]["icon"]["fg"]))
-				else
-					cobalt.graphics.print("*",i-camera.x,j-camera.y,colors.black,colors.grey)
+	--local epoch = os.time("utc")
+	if cobalt.state == "game" then
+		for i=1,19 do
+			cobalt.graphics.print(string.rep("/",51),1,i,colors.black,colors.gray)
+		end
+		for i=camera.x,camera.x+camera.xSize do
+			for j=camera.y,camera.y+camera.ySize do
+				if map["tileMap"][i] and map["tileMap"][i][j] and map["tileMap"][i][j]["icon"] then
+					if not map["tileMap"][i][j].x then map["tileMap"][i][j].x = i end
+					if not map["tileMap"][i][j].y then map["tileMap"][i][j].y = j end
+					if determineVisibility(players.localPlayer,map["tileMap"][i][j]) or application == "mapmaker" then
+						cobalt.graphics.print(map["tileMap"][i][j]["icon"]["text"],i-camera.x,j-camera.y,map["tileMap"][i][j]["icon"]["bg"],map["tileMap"][i][j]["icon"]["fg"])
+						
+						map["tileMapMemory"][i][j] = {}
+						map["tileMapMemory"][i][j].icon = {} 
+						map["tileMapMemory"][i][j].icon.text = map["tileMap"][i][j].icon.text
+						map["tileMapMemory"][i][j].icon.fg = map["tileMap"][i][j].icon.fg
+						map["tileMapMemory"][i][j].icon.bg = map["tileMap"][i][j].icon.bg
+					elseif map["tileMapMemory"][i][j] then
+						cobalt.graphics.print(map["tileMapMemory"][i][j]["icon"]["text"],i-camera.x,j-camera.y,cobalt.graphics.darken(map["tileMapMemory"][i][j]["icon"]["bg"]),cobalt.graphics.darken(map["tileMapMemory"][i][j]["icon"]["fg"]))
+					else
+						cobalt.graphics.print("*",i-camera.x,j-camera.y,colors.black,colors.grey)
+					end
+				elseif map["tileMap"][i] and map["tileMap"][i][j] then
+					if not map["tileMap"][i][j].x then map["tileMap"][i][j].x = i end
+					if not map["tileMap"][i][j].y then map["tileMap"][i][j].y = j end
+					if determineVisibility(players.localPlayer,map["tileMap"][i][j]) or application == "mapmaker" then
+						cobalt.graphics.print(" ",i-camera.x,j-camera.y,colors.black,colors.black)
+					elseif map["tileMapMemory"][i][j] then
+						cobalt.graphics.print(" ",i-camera.x,j-camera.y,colors.black,colors.black)
+					else
+						cobalt.graphics.print("*",i-camera.x,j-camera.y,colors.black,colors.grey)
+					end
 				end
-			elseif map["tileMap"][i] and map["tileMap"][i][j] then
-				if not map["tileMap"][i][j].x then map["tileMap"][i][j].x = i end
-				if not map["tileMap"][i][j].y then map["tileMap"][i][j].y = j end
-				if determineVisibility(players.localPlayer,map["tileMap"][i][j]) or application == "mapmaker" then
-					cobalt.graphics.print(" ",i-camera.x,j-camera.y,colors.black,colors.black)
-				elseif map["tileMapMemory"][i][j] then
-					cobalt.graphics.print(" ",i-camera.x,j-camera.y,colors.black,colors.black)
-				else
-					cobalt.graphics.print("*",i-camera.x,j-camera.y,colors.black,colors.grey)
-				end
-			end
-			
-			if map["entityMap"][i] and map["entityMap"][i][j] and map["entityMap"][i][j]["icon"] then
-				if not map["entityMap"][i][j].x then map["entityMap"][i][j].x = i end
-				if not map["entityMap"][i][j].y then map["entityMap"][i][j].y = j end
-				if determineVisibility(players.localPlayer,map["entityMap"][i][j]) or application == "mapmaker" then
-					cobalt.graphics.print(map["entityMap"][i][j]["icon"]["text"],i-camera.x,j-camera.y,map["entityMap"][i][j]["icon"]["bg"],map["entityMap"][i][j]["icon"]["fg"])
-					
-					map["entityMapMemory"][i][j] = {}
-					map["entityMapMemory"][i][j].icon = {} 
-					map["entityMapMemory"][i][j].icon.text = map["entityMap"][i][j].icon.text
-					map["entityMapMemory"][i][j].icon.fg = map["entityMap"][i][j].icon.fg
-					map["entityMapMemory"][i][j].icon.bg = map["entityMap"][i][j].icon.bg
-				elseif map["entityMapMemory"][i][j] then
-					cobalt.graphics.print(map["entityMapMemory"][i][j]["icon"]["text"],i-camera.x,j-camera.y,cobalt.graphics.darken(map["entityMapMemory"][i][j]["icon"]["bg"]),cobalt.graphics.darken(map["entityMapMemory"][i][j]["icon"]["fg"]))
-				else
-					cobalt.graphics.print("*",i-camera.x,j-camera.y,colors.black,colors.grey)
+				
+				if map["entityMap"][i] and map["entityMap"][i][j] and map["entityMap"][i][j]["icon"] then
+					if not map["entityMap"][i][j].x then map["entityMap"][i][j].x = i end
+					if not map["entityMap"][i][j].y then map["entityMap"][i][j].y = j end
+					if determineVisibility(players.localPlayer,map["entityMap"][i][j]) or application == "mapmaker" then
+						cobalt.graphics.print(map["entityMap"][i][j]["icon"]["text"],i-camera.x,j-camera.y,map["entityMap"][i][j]["icon"]["bg"],map["entityMap"][i][j]["icon"]["fg"])
+						
+						map["entityMapMemory"][i][j] = {}
+						map["entityMapMemory"][i][j].icon = {} 
+						map["entityMapMemory"][i][j].icon.text = map["entityMap"][i][j].icon.text
+						map["entityMapMemory"][i][j].icon.fg = map["entityMap"][i][j].icon.fg
+						map["entityMapMemory"][i][j].icon.bg = map["entityMap"][i][j].icon.bg
+					elseif map["entityMapMemory"][i][j] then
+						cobalt.graphics.print(map["entityMapMemory"][i][j]["icon"]["text"],i-camera.x,j-camera.y,cobalt.graphics.darken(map["entityMapMemory"][i][j]["icon"]["bg"]),cobalt.graphics.darken(map["entityMapMemory"][i][j]["icon"]["fg"]))
+					else
+						cobalt.graphics.print("*",i-camera.x,j-camera.y,colors.black,colors.grey)
+					end
 				end
 			end
 		end
-	end
-	
-	if application == "rmplane" then
-		for k,v in pairs(players) do
-			if v.x >= camera.x and v.x <= camera.x+camera.xSize then
-				if v.y >= camera.y and v.y <= camera.y+camera.ySize then
-					cobalt.graphics.print(v["icon"]["text"],v.x-camera.x,v.y-camera.y,v["icon"]["bg"],v["icon"]["fg"])
+		
+		if application == "rmplane" then
+			for k,v in pairs(players) do
+				if v.x >= camera.x and v.x <= camera.x+camera.xSize then
+					if v.y >= camera.y and v.y <= camera.y+camera.ySize then
+						cobalt.graphics.print(v["icon"]["text"],v.x-camera.x,v.y-camera.y,v["icon"]["bg"],v["icon"]["fg"])
+					end
+				end
+				--cobalt.graphics.print("X - "..v.x,3,1,nil,colors.white)
+				--cobalt.graphics.print("Y - "..v.y,3,2,nil,colors.white)
+			end
+		end
+		
+		if application == "mapmaker" then
+			cobalt.graphics.print("Camera X - "..camera.x,3,17,nil,colors.white)
+			cobalt.graphics.print("Camera Y - "..camera.y,3,18,nil,colors.white)
+			cobalt.graphics.print("Mouse X - "..lastMouse.x+lastMouse.cx,20,17,nil,colors.white)
+			cobalt.graphics.print("Mouse Y - "..lastMouse.y+lastMouse.cy,20,18,nil,colors.white)
+		end
+		
+		if map.scriptBinds and map.scriptBinds.onDraw then
+			for k,v in pairs(map.scriptBinds.onDraw) do
+				if v and v.scripts and v.scripts.onDraw then
+					v.scripts.onDraw(v,map,players)
 				end
 			end
 		end
+		
+		cobalt.graphics.print("CTRL to pause",38,18,nil,colors.white)
+	elseif cobalt.state == "paused" then
+	
+	elseif cobalt.state == "intro" then
+		--[[local ct = 0
+		for k,v in pairs(introGUI.Story.text) do
+			ct = ct + 1
+			term.setCursorPos(2,2+ct)
+			term.write(tostring(k)..", "..tostring(v))--,2,2+ct,nil,colors.white)
+		end]]--
+		--sleep(2)
+		--error(introGUI.Story.unformatted)
+		introColor = introStory[currentIntroStory]["color"]
+		introColor2 = introStory[currentIntroStory]["foreColour"]
+		refreshIntroGUI()
+		introGUI.Story.text = introGUI.Story.unformatted..string.sub(introStory[currentIntroStory]["text"],#introGUI.Story.unformatted,#introGUI.Story.unformatted+1)
 	end
 	
-	if application == "mapmaker" then
-		cobalt.graphics.print("Camera X - "..camera.x,3,17,nil,colors.white)
-		cobalt.graphics.print("Camera Y - "..camera.y,3,18,nil,colors.white)
-		cobalt.graphics.print("Mouse X - "..lastMouse.x+lastMouse.cx,20,17,nil,colors.white)
-		cobalt.graphics.print("Mouse Y - "..lastMouse.y+lastMouse.cy,20,18,nil,colors.white)
-	end
+	local currentTick = os.time()
+	cobalt.graphics.print(math.floor(1/((currentTick*0.833*60) - (lastTick*0.833*60))).." FPS",2,2,nil,colors.white)
+	lastTick = currentTick
 	
 	cobalt.ui.draw()
+	--error(os.time("utc") - epoch)
 end
 
 function cobalt.mousepressed( x, y, button )
@@ -651,7 +908,8 @@ local function moveCamera(player,tx,ty)
 end
 
 local function loopObjectsForMoveScript(plr) -- Yup, great function name
-	for k,v in pairs(map.tileMap) do
+	--local epoch = os.time("utc")
+	--[[for k,v in pairs(map.tileMap) do
 		for p,b in pairs(v) do
 			if b.scripts and b.scripts.onPlayerMove then
 				local returnData = b.scripts.onPlayerMove(b,map.tileMap,map.entityMap,players,plr)
@@ -685,64 +943,59 @@ local function loopObjectsForMoveScript(plr) -- Yup, great function name
 				end
 			end
 		end
+	end]]--
+	for k,v in pairs(map.scriptBinds.onPlayerMove) do
+		local returnData = v.scripts.onPlayerMove(v,map.tileMap,map.entityMap,players,plr)
+		if returnData["tileMap"] then
+			for k,v in pairs(returnData["tileMap"]) do
+				map.tileMap[v.x][v.y] = v
+			end
+		end
+		if returnData["entityMap"] then
+			for k,v in pairs(returnData["entityMap"]) do
+				map.entityMap[v.x][v.y] = v
+			end
+		end
 	end
+	--error(os.time("utc") - epoch)
 end
 
 function cobalt.keypressed( keycode, key )
-	if key == "left" or key == "up" or key == "right" or key == "down" then
+	--local epoch = os.time("utc")
+	if (key == "left" or key == "up" or key == "right" or key == "down" or key == "a" or key == "w" or key == "d" or key == "s") and cobalt.state == "game" then
 		local moveSuccess = false
 		local player = players["localPlayer"]
 		
 		if application == "rmplane" then
-			if key == "left" then
-				if findTile(player.x-1,player.y) then
-					local t,e = findTile(player.x-1,player.y)
-					if (t.passable or t.type == nil) and e.type == nil then
-						player.x = player.x - 1
-						moveCamera(player,-1,0)
-						moveSuccess = true
-						loopObjectsForMoveScript(players["localPlayer"])
-					end
-				end
-			elseif key == "right" then
-				if findTile(player.x+1,player.y) then
-					local t,e = findTile(player.x+1,player.y)
-					if (t.passable or t.type == nil) and e.type == nil then
-						player.x = player.x + 1
-						moveCamera(player,1,0)
-						moveSuccess = true
-						loopObjectsForMoveScript(players["localPlayer"])
-					end
-				end
-			elseif key == "up" then
-				if findTile(player.x,player.y-1) then
-					local t,e = findTile(player.x,player.y-1)
-					if (t.passable or t.type == nil) and e.type == nil then
-						player.y = player.y - 1
-						moveCamera(player,0,-1)
-						moveSuccess = true
-						loopObjectsForMoveScript(players["localPlayer"])
-					end
-				end
-			elseif key == "down" then
-				if findTile(player.x,player.y+1) then
-					local t,e = findTile(player.x,player.y+1)
-					if (t.passable or t.type == nil) and e.type == nil then
-						player.y = player.y + 1
-						moveCamera(player,0,1)
-						moveSuccess = true
-						loopObjectsForMoveScript(players["localPlayer"])
-					end
+			local a = 0
+			local b = 0
+			if key == "left" or key == "a" then
+				a = -1
+			elseif key == "right" or key == "d" then
+				a = 1
+			elseif key == "up" or key == "w" then
+				b = -1
+			elseif key == "down" or key == "s" then
+				b = 1
+			end
+			if findTile(player.x+a,player.y+b) and player.frozen == false then
+				local t,e = findTile(player.x+a,player.y+b)
+				if ((t.passable or t.type == nil) and e.type == nil) or player.ghost then
+					player.x = player.x + a
+					player.y = player.y + b
+					moveCamera(player,a,b)
+					moveSuccess = true
+					loopObjectsForMoveScript(players["localPlayer"])
 				end
 			end
 		else -- MAP MAKER
-			if key == "left" and camera.x > 0 then
+			if (key == "left" or key == "a") and camera.x > 0 then
 				camera.x = camera.x - 1
-			elseif key == "right" and camera.x+camera.xSize < map.xSize then
+			elseif (key == "right" or key == "d") and camera.x+camera.xSize < map.xSize then
 				camera.x = camera.x + 1
-			elseif key == "up" and camera.y > 0 then
+			elseif (key == "up" or key == "w") and camera.y > 0 then
 				camera.y = camera.y - 1
-			elseif key == "down" and camera.y+camera.ySize < map.ySize then
+			elseif (key == "down" or key == "s") and camera.y+camera.ySize < map.ySize then
 				camera.y = camera.y + 1
 			end
 		end
@@ -751,7 +1004,21 @@ function cobalt.keypressed( keycode, key )
 			tick = tickRate -- Force an update when we move
 		end
 	end
+	if (cobalt.state == "paused" or cobalt.state == "game") and currentLevel then
+		if key == "leftCtrl" or key == "rightCtrl" then
+			if cobalt.state == "game" then cobalt.state = "paused" else cobalt.state = "game" end
+		end
+	end
+	if cobalt.state == "game" and key == "q" then
+		players["localPlayer"]["ghost"] = not players["localPlayer"]["ghost"]
+		if players["localPlayer"]["ghost"] then
+			players["localPlayer"]["icon"]["fg"] = colors.purple
+		else
+			players["localPlayer"]["icon"]["fg"] = colors.white
+		end
+	end
 	cobalt.ui.keypressed(keycode,key)
+	--error(os.time("utc"))-- - epoch)
 end
 
 function cobalt.keyreleased( keycode, key )

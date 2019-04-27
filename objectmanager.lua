@@ -101,7 +101,7 @@ local tileTypes = {
 			["fg"] = colors.lightGray,
 		},
 		["scripts"] = {
-			["onLoad"] = function(tile,tx,ty,localArgs)
+			["onLoad"] = function(tile,tx,ty,localArgs,map)
 				local randT = {
 					[1] = "'",
 					[2] = ".",
@@ -125,7 +125,20 @@ local tileTypes = {
 		},
 		["passable"] = false,
 		["transparent"] = false,
-		["scripts"] = {},
+		["scripts"] = {
+			--[[["onLoad"] = function(tile,tx,ty,localArgs,map)
+				local randT = {
+					[1] = "'",
+					[2] = ".",
+					[3] = '"',
+					[4] = ",",
+				}
+				local rand = math.random(1,4)
+				local text = randT[rand]
+				
+				return {["object"] = {["icon"] = {["text"] = text,["bg"] = colors.lightGray,["fg"] = colors.black}}}
+			end,]]--
+		},
 	},
 	[2] = {
 		["name"] = "Spawn",
@@ -139,7 +152,7 @@ local tileTypes = {
 		["transparent"] = true,
 		["perceptionRequirement"] = 99,
 		["scripts"] = {
-			["onLoad"] = function(tile,tx,ty,localArgs)
+			["onLoad"] = function(tile,tx,ty,localArgs,map)
 				for k,v in pairs(localArgs["players"]) do
 					v.x = tx
 					v.y = ty
@@ -158,7 +171,7 @@ local tileTypes = {
 		["passable"] = true,
 		["transparent"] = true,
 		["scripts"] = {
-			["onLoad"] = function(tile,tx,ty,localArgs)
+			["onLoad"] = function(tile,tx,ty,localArgs,map)
 				local returnText = ""
 				local returnData = {
 					[0] = "Congrats!",
@@ -169,6 +182,9 @@ local tileTypes = {
 					[5] = "for this game though, and what kind of",
 					[6] = "levels can be made!",
 					[7] = "P.S. please vote for me to win CCJam17 .u.",
+					
+					[8] = "Welcome to the first plane, use left click to pick things up. Solve the following puzzles!",
+					[9] = "Congrats, you're almost done! Your job in each level is to reach the exit portal/ exit crystal. Good luck!"
 				}
 				
 				if returnData[tile.metaData] then
@@ -240,6 +256,53 @@ local tileTypes = {
 		["transparent"] = false,
 		["scripts"] = {},
 	},
+	[9] = {
+		["name"] = "Magical Wall",
+		["description"] = "A barrier from floor to ceiling crisscrossed with fast, fiery bands that look painful to touch.",
+		["icon"] = {
+			["text"] = "#",
+			["bg"] = colors.red,
+			["fg"] = colors.orange,
+		},
+		["passable"] = false,
+		["transparent"] = false,
+		["scripts"] = {},
+	},
+	[10] = {
+		["name"] = "B.Pressure Pad",
+		["description"] = "It appears to be an ordinary pressure pad, except it looks like it's connected to a larger circuit.",
+		["icon"] = {
+			["text"] = "+",
+			["bg"] = colors.darkGrey,
+			["fg"] = colors.grey,
+		},
+		["passable"] = true,
+		["transparent"] = true,
+		["scripts"] = {},
+		["activated"] = false,
+		["connectedLogic"] = {},
+		["signal"] = false,
+	},
+	[100] = {
+		["name"] = "Exit Portal",
+		["description"] = "Walk through this portal to finish the level!",
+		["icon"] = {
+			["text"] = "O",
+			["bg"] = colors.green,
+			["fg"] = colors.lime,
+		},
+		["passable"] = true,
+		["transparent"] = true,
+		["perceptionRequirement"] = 99,
+		["scripts"] = {
+			["onLoad"] = function(tile,tx,ty,localArgs,map)
+				for k,v in pairs(localArgs["players"]) do
+					v.x = tx
+					v.y = ty
+				end
+			end,
+		},
+	}
 }
 
 local entityTypes = {
@@ -364,30 +427,105 @@ tileTypes[5]["scripts"]["onPlayerMove"] = function(object,tileMap,entityMap,play
 	return returnData
 end
 
-tileTypes[6]["scripts"]["onUpdate"] = function(object,tileMap,entityMap,players)
+local function pressurePadLoad(object,tx,ty,localArgs,map)
+	object["gates"] = {}
+	object["magicalWalls"] = {}
+	local tileMap = map.tileMap
+	for k,v in pairs(tileMap) do
+		for p,b in pairs(v) do
+			if (b.type == 4) and b.metaData == object.metaData then
+				table.insert(object["gates"],b)
+			elseif (b.type == 9) and b.metaData == object.metaData then
+				table.insert(object["magicalWalls"],b)
+			end
+			if object["name"] == "B.Pressure Pad" and b.metaData == object.metaData and b["connectedLogic"] then
+				table.insert(object["connectedLogic"],b)
+			end
+		end
+	end
+end
+
+tileTypes[6]["scripts"]["onLoad"] = function(object,tx,ty,localArgs,map)
+	pressurePadLoad(object,tx,ty,localArgs,map)
+end
+
+tileTypes[10]["scripts"]["onLoad"] = function(object,tx,ty,localArgs,map)
+	pressurePadLoad(object,tx,ty,localArgs,map)
+end
+
+local function pressurePadUpdate(object,map,players)
 	local returnData = {}
 	returnData.tileMap = {}
+	local tileMap = map.tileMap
+	local entityMap = map.entityMap
 	
-	if (entityMap[object.x][object.y] and entityMap[object.x][object.y]["name"]) or (players["localPlayer"]["x"] == object.x and players["localPlayer"]["y"] == object.y)then
-		for k,v in pairs(tileMap) do
-			for p,b in pairs(v) do
-				if (b.type == 4) and b.metaData == object.metaData then
-					local returnTile = b
-					returnTile["passable"] = true
-					returnTile["transparent"] = true
-					returnTile["icon"] = {
-						["text"] = " ",
-						["bg"] = colors.darkGrey,
-						["fg"] = colors.brown,
-					}
-					returnTile["name"] = "Open Gate"
-					returnTile["description"] = "A tall, wooden gate criss crossed by steel bars. It appears to be open."
-					table.insert(returnData.tileMap,returnTile)
+	local B = true
+	if object["connectedLogic"] then
+		for k,v in pairs(object["connectedLogic"]) do
+			if (v["signal"] == false) or (v["signal"] == nil) then B = false break end
+		end
+	end
+	
+	if (entityMap[object.x][object.y] and entityMap[object.x][object.y]["name"]) or (players["localPlayer"]["x"] == object.x and players["localPlayer"]["y"] == object.y) then
+		object["signal"] = true
+		if B then
+			--[[for k,v in pairs(tileMap) do
+				for p,b in pairs(v) do
+					if (b.type == 4) and b.metaData == object.metaData then
+						local returnTile = b
+						returnTile["passable"] = true
+						returnTile["transparent"] = true
+						returnTile["icon"] = {
+							["text"] = " ",
+							["bg"] = colors.darkGrey,
+							["fg"] = colors.brown,
+						}
+						returnTile["name"] = "Open Gate"
+						returnTile["description"] = "A tall, wooden gate criss crossed by steel bars. It appears to be open."
+						table.insert(returnData.tileMap,returnTile)
+					end
 				end
+			end]]--
+			for p,b in pairs(object["gates"]) do
+				local returnTile = b
+				returnTile["passable"] = true
+				returnTile["transparent"] = true
+				returnTile["icon"] = {
+					["text"] = " ",
+					["bg"] = colors.darkGrey,
+					["fg"] = colors.brown,
+				}
+				returnTile["name"] = "Open Gate"
+				returnTile["description"] = "A tall, wooden gate criss crossed by steel bars. It appears to be open."
+				table.insert(returnData.tileMap,returnTile)
+			end
+			for p,b in pairs(object["magicalWalls"]) do
+				local returnTile = b
+				returnTile["passable"] = true
+				returnTile["transparent"] = false
+				local a = math.random(1,2)
+				local bg = colors.pink
+				local fg = colors.yellow
+				if a == 1 then
+					bg = colors.lime
+					fg = colors.pink
+				elseif a == 2 then
+					bg = colors.blue
+					fg = colors.pink
+				end
+				returnTile["icon"] = {
+					["text"] = "*",
+					["bg"] = bg,
+					["fg"] = fg,
+				}
+				returnTile["name"] = "Magical Dust"
+				returnTile["description"] = "Glittering dust covers the floor where the barrier once stood."
+				table.insert(returnData.tileMap,returnTile)
 			end
 		end
 	else
-		for k,v in pairs(tileMap) do
+		object["signal"] = false
+		--[[for k,v in pairs(tileMap) do
 			for p,b in pairs(v) do
 				if (b.type == 4) and b.metaData == object.metaData then
 					local returnTile = b
@@ -403,10 +541,44 @@ tileTypes[6]["scripts"]["onUpdate"] = function(object,tileMap,entityMap,players)
 					table.insert(returnData.tileMap,returnTile)
 				end
 			end
+		end]]--
+		for p,b in pairs(object["gates"]) do
+			local returnTile = b
+			returnTile["passable"] = false
+			returnTile["transparent"] = false
+			returnTile["icon"] = {
+				["text"] = "=",
+				["bg"] = colors.brown,
+				["fg"] = colors.grey,
+			}
+			returnTile["name"] = "Locked Gate"
+			returnTile["description"] = "A tall, wooden gate criss crossed by steel bars."
+			table.insert(returnData.tileMap,returnTile)
+		end
+		for p,b in pairs(object["magicalWalls"]) do
+			local returnTile = b
+			returnTile["passable"] = false
+			returnTile["transparent"] = false
+			returnTile["icon"] = {
+				["text"] = "#",
+				["bg"] = colors.red,
+				["fg"] = colors.orange,
+			}
+			returnTile["name"] = "Magical Wall"
+			returnTile["description"] = "A barrier from floor to ceiling crisscrossed with fast, fiery bands that look painful to touch."
+			table.insert(returnData.tileMap,returnTile)
 		end
 	end
 	 
-	 return returnData
+	return returnData
+end
+
+tileTypes[6]["scripts"]["onUpdate"] = function(object,map,players)
+	return pressurePadUpdate(object,map,players)
+end
+
+tileTypes[10]["scripts"]["onUpdate"] = function(object,map,players)
+	return pressurePadUpdate(object,map,players)
 end
 
 tileTypes[7]["scripts"]["onMouseClick"] = function(object,tileMap,entityMap,players,button)
@@ -440,6 +612,29 @@ entityTypes[1]["scripts"]["onDrop"] = function(object,newX,newY,newTile,tileMap)
 	return returnData
 end
 
+tileTypes[100]["scripts"]["onDraw"] = function(object,map,players)
+	object["icon"]["text"] = string.char(math.random(20,120))
+end
+
+tileTypes[100]["scripts"]["onUpdate"] = function(object,map,players)
+	local returnData = {}
+	returnData.tileMap = {}
+	local tileMap = map.tileMap
+	local entityMap = map.entityMap
+	
+	if players["localPlayer"]["x"] == object.x and players["localPlayer"]["y"] == object.y then
+		players["localPlayer"]["finishedLevel"] = true
+	end
+	
+	return returnData
+end
+
+tileTypes[9]["scripts"]["onDraw"] = function(object,map,players)
+	if object["name"] == "Magical Wall" then
+		object["icon"]["text"] = string.char(math.random(20,120))
+	end
+end
+	
 objectManager.loadTileTypes = function()
 	return newTileTypes
 end
