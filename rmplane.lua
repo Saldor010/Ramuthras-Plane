@@ -7,7 +7,10 @@ local musicInstance = {}
 local soundInstance = {}
 
 local args = {...}
-local application = args[1] or "rmplane"
+local application = "rmplane"
+if args[1] then 
+	application = "mapmaker"
+end
 
 local tick = 0
 local tickRate = 0.2
@@ -21,6 +24,7 @@ lastMouse.cy = 0
 
 local levels = {
 	[1] = "level1.rpmap",
+	[2] = "level2.rpmap",
 }
 local currentLevel = nil
 
@@ -240,6 +244,7 @@ players = {
 		["y"] = 5,
 		["ghost"] = false,
 		["frozen"] = false,
+		["movedThisTick"] = false,
 		["icon"] = {
 			["text"] = "@",
 			["bg"] = nil,
@@ -363,18 +368,38 @@ local function loadMap(file)
 					tile.type = tonumber("0x"..string.sub(line,5,7))
 					tile.metaData = tonumber("0x"..string.sub(line,8,9))
 					local whereTo = tonumber("0x"..string.sub(line,10,10))
+					local ct = 0
+					local function recursion(a,b)
+						ct = ct + 1
+						--print(ct)
+						for k,v in pairs(a) do
+							if ct > 400 then
+								--print(k)
+								--sleep(0.1)
+							end
+							--sleep()
+							if type(v) == "table" then
+								b[k] = {}
+								recursion(v,b[k])
+							else
+								b[k] = v
+							end
+						end
+					end
 					if whereTo == 0 then
 						if tileTypes[tile.type] then
-							for k,v in pairs(tileTypes[tile.type]) do
+							recursion(tileTypes[tile.type],tile)
+							--[[for k,v in pairs(tileTypes[tile.type]) do
 								tile[k] = v
-							end
+							end]]--
 						end
 						loadedMap["tileMap"][tile.x][tile.y] = tile
 					elseif whereTo == 1 then
 						if entityTypes[tile.type] then
-							for k,v in pairs(entityTypes[tile.type]) do
+							recursion(entityTypes[tile.type],tile)
+							--[[for k,v in pairs(entityTypes[tile.type]) do
 								tile[k] = v
-							end
+							end]]--
 						end
 						loadedMap["entityMap"][tile.x][tile.y] = tile
 					else
@@ -383,6 +408,7 @@ local function loadMap(file)
 				end
 			end
 		end
+		handle.close()
 		map = loadedMap
 		map["scriptBinds"] = {
 			["onPlayerMove"] = {},
@@ -505,6 +531,18 @@ function loadLevel(level)
 		if level >= 7 then mainMenuColor = colors.blue elseif level >= 4 then mainMenuColor = colors.green else mainMenuColor = colors.red end
 		mainMenuGUI.ResumeGameButton.backColour = mainMenuColor
 		mainMenuGUI.ResumeGameButton.enabled = true
+		players["localPlayer"]["finishedLevel"] = false
+		players["localPlayer"]["icon"]["text"] = "@"
+		players["localPlayer"]["frozen"] = false
+		--[[for k,v in pairs(map["entityMap"]) do
+			for p,b in pairs(v) do
+				if b["name"] == "Spawn" then
+					players["localPlayer"]["x"] = k
+					players["localPlayer"]["y"] = p
+				end
+			end
+		end]]--
+		rmplane.GUI.playerPanel.carryingText.text = ""
 	else
 		error("Level does not exist! "..level..", "..levels[level])
 	end
@@ -518,12 +556,31 @@ for i=1,3 do
 	end
 end
 
-if application == "mapmaker" and fs.exists(fs.getDir(shell.getRunningProgram()).."/maps/workingmap.rpmap") then
-	loadMap(fs.getDir(shell.getRunningProgram()).."/maps/workingmap.rpmap")
+local workingPath = nil
+if application == "mapmaker" then
+	local a = nil
+	if fs.exists(fs.getDir(shell.getRunningProgram()).."/maps/"..args[1]) then
+		a = fs.getDir(shell.getRunningProgram()).."/maps/"..args[1]
+	elseif fs.exists(fs.getDir(shell.getRunningProgram()).."/maps/"..args[1]..".rpmap") then
+		a = fs.getDir(shell.getRunningProgram()).."/maps/"..args[1]..".rpmap"
+	end
+	if a == nil then
+		print(fs.getDir(shell.getRunningProgram()).."/maps/"..args[1]..".rpmap")
+		local handle = fs.open(fs.getDir(shell.getRunningProgram()).."/maps/"..args[1]..".rpmap","w")
+		handle.writeLine(args[1])
+		handle.writeLine(255)
+		handle.writeLine(255)
+		handle.close()
+		workingPath = fs.getDir(shell.getRunningProgram()).."/maps/"..args[1]..".rpmap"
+		loadMap(fs.getDir(shell.getRunningProgram()).."/maps/"..args[1]..".rpmap")
+	else
+		workingPath = a
+		loadMap(a)
+	end
 end
 
 mapmaker.GUI.saveButton.onclick = function()
-	saveMap(fs.getDir(shell.getRunningProgram()).."/maps/workingmap.rpmap","workingmap",255,255)
+	saveMap(workingPath,args[1],255,255)
 end
 
 --loadMap(fs.getDir(shell.getRunningProgram()).."/maps/level1.rpmap")
@@ -602,7 +659,10 @@ local function distanceOK(x1,y1,x2,y2)
 	end
 end
 
+local currentFPS = 0
 function cobalt.update( dt )
+	if dt == 0 then dt = 0.01 end
+	currentFPS = 1/dt
 	tick = tick + dt
 	if map and tick >= tickRate then
 		tick = 0
@@ -628,6 +688,21 @@ function cobalt.update( dt )
 			end
 		end]]--
 		--error(#map.scriptBinds.onUpdate)
+		for k,v in pairs(map["entityMap"]) do
+			for p,b in pairs(v) do
+				--[[if b["movedThisTick"] and b["icon"] then
+					b["icon"]["text"] = "X"
+				elseif b["icon"] then
+					b["icon"]["text"] = "O"
+				end]]--
+				--[[if b["icon"] then
+					b["icon"]["text"] = string.char(math.random(20,120))
+				end]]--
+				b["movedThisTick"] = false
+			end
+		end
+		players["localPlayer"]["movedThisTick"] = false
+		
 		if map.scriptBinds and map.scriptBinds.onUpdate then
 			for k,v in pairs(map.scriptBinds.onUpdate) do
 				if v and v.scripts and v.scripts.onUpdate then
@@ -770,7 +845,8 @@ function cobalt.draw()
 	end
 	
 	local currentTick = os.time()
-	cobalt.graphics.print(math.floor(1/((currentTick*0.833*60) - (lastTick*0.833*60))).." FPS",2,2,nil,colors.white)
+	--cobalt.graphics.print(math.floor(1/((currentTick*0.833*60) - (lastTick*0.833*60))).." FPS",2,2,nil,colors.white)
+	cobalt.graphics.print(currentFPS.." FPS",2,2,nil,colors.white)
 	lastTick = currentTick
 	
 	cobalt.ui.draw()
@@ -847,7 +923,7 @@ function cobalt.mousepressed( x, y, button )
 						map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] = {}
 					end
 				end
-			elseif map.entityMap[lastMouse.x+lastMouse.cx] and map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] and map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy].name == nil and button == 1 and distanceOK(players["localPlayer"]["x"],players["localPlayer"]["y"],lastMouse.x+lastMouse.cx,lastMouse.y+lastMouse.cy) and players["localPlayer"]["carrying"] then
+			elseif map.entityMap[lastMouse.x+lastMouse.cx] and map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] and map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy].name == nil and button == 1 and distanceOK(players["localPlayer"]["x"],players["localPlayer"]["y"],lastMouse.x+lastMouse.cx,lastMouse.y+lastMouse.cy) and players["localPlayer"]["carrying"] and map["tileMap"][lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy]["itemPlaceable"] == true then
 				for k,v in pairs(players["localPlayer"]["carrying"]) do
 					map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy][k] = v
 				end
@@ -905,6 +981,12 @@ local function moveCamera(player,tx,ty)
 	
 	camera.x = camera.x + tx
 	camera.y = camera.y + ty
+end
+
+players["localPlayer"]["move"] = function(self,dX,dY)
+	self["x"] = self["x"] + dX
+	self["y"] = self["y"] + dY
+	moveCamera(player,dX,dY)
 end
 
 local function loopObjectsForMoveScript(plr) -- Yup, great function name
@@ -967,6 +1049,7 @@ function cobalt.keypressed( keycode, key )
 		local player = players["localPlayer"]
 		
 		if application == "rmplane" then
+			cobalt.update(0)
 			local a = 0
 			local b = 0
 			if key == "left" or key == "a" then
@@ -981,9 +1064,10 @@ function cobalt.keypressed( keycode, key )
 			if findTile(player.x+a,player.y+b) and player.frozen == false then
 				local t,e = findTile(player.x+a,player.y+b)
 				if ((t.passable or t.type == nil) and e.type == nil) or player.ghost then
-					player.x = player.x + a
+					--[[player.x = player.x + a
 					player.y = player.y + b
-					moveCamera(player,a,b)
+					moveCamera(player,a,b)]]--
+					player:move(a,b)
 					moveSuccess = true
 					loopObjectsForMoveScript(players["localPlayer"])
 				end
@@ -1016,6 +1100,14 @@ function cobalt.keypressed( keycode, key )
 		else
 			players["localPlayer"]["icon"]["fg"] = colors.white
 		end
+	end
+	if cobalt.state == "game" and application == "rmplane" and key == "enter" then
+		if levels[currentLevel+1] then
+			loadLevel(currentLevel+1)
+		end
+	end
+	if key == "z" then
+		players["localPlayer"]["farthestLevelUnlocked"] = 9
 	end
 	cobalt.ui.keypressed(keycode,key)
 	--error(os.time("utc"))-- - epoch)

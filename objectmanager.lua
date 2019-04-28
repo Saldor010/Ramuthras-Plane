@@ -100,6 +100,7 @@ local tileTypes = {
 			["bg"] = colors.black,
 			["fg"] = colors.lightGray,
 		},
+		["itemPlaceable"] = true,
 		["scripts"] = {
 			["onLoad"] = function(tile,tx,ty,localArgs,map)
 				local randT = {
@@ -125,6 +126,7 @@ local tileTypes = {
 		},
 		["passable"] = false,
 		["transparent"] = false,
+		["itemPlaceable"] = false,
 		["scripts"] = {
 			--[[["onLoad"] = function(tile,tx,ty,localArgs,map)
 				local randT = {
@@ -151,6 +153,7 @@ local tileTypes = {
 		["passable"] = true,
 		["transparent"] = true,
 		["perceptionRequirement"] = 99,
+		["itemPlaceable"] = true,
 		["scripts"] = {
 			["onLoad"] = function(tile,tx,ty,localArgs,map)
 				for k,v in pairs(localArgs["players"]) do
@@ -170,6 +173,7 @@ local tileTypes = {
 		},
 		["passable"] = true,
 		["transparent"] = true,
+		["itemPlaceable"] = false,
 		["scripts"] = {
 			["onLoad"] = function(tile,tx,ty,localArgs,map)
 				local returnText = ""
@@ -205,6 +209,7 @@ local tileTypes = {
 		},
 		["passable"] = false,
 		["transparent"] = false,
+		["itemPlaceable"] = false,
 		["scripts"] = {},
 	},
 	[5] = {
@@ -217,6 +222,7 @@ local tileTypes = {
 		},
 		["passable"] = false,
 		["transparent"] = false,
+		["itemPlaceable"] = true,
 		["scripts"] = {},
 	},
 	[6] = {
@@ -229,6 +235,7 @@ local tileTypes = {
 		},
 		["passable"] = true,
 		["transparent"] = true,
+		["itemPlaceable"] = true,
 		["scripts"] = {},
 		["activated"] = false,
 	},
@@ -266,6 +273,7 @@ local tileTypes = {
 		},
 		["passable"] = false,
 		["transparent"] = false,
+		["itemPlaceable"] = false,
 		["scripts"] = {},
 	},
 	[10] = {
@@ -278,10 +286,69 @@ local tileTypes = {
 		},
 		["passable"] = true,
 		["transparent"] = true,
+		["itemPlaceable"] = true,
 		["scripts"] = {},
 		["activated"] = false,
 		["connectedLogic"] = {},
 		["signal"] = false,
+	},
+	[11] = {
+		["name"] = "Slope",
+		["description"] = "A smooth gradient of rock that appears too steep to climb.",
+		["icon"] = {
+			["text"] = ">",
+			["bg"] = colors.black,
+			["fg"] = colors.lightGray,
+		},
+		["passable"] = true,
+		["transparent"] = true,
+		["itemPlaceable"] = true,
+		["scripts"] = {},
+		["activated"] = false,
+		["connectedLogic"] = {},
+	},
+	[12] = {
+		["name"] = "Piston",
+		["description"] = "An iron base fitted with a flat head, it looks like it could push something.",
+		["icon"] = {
+			["text"] = ">",
+			["bg"] = colors.gray,
+			["fg"] = colors.white,
+		},
+		["passable"] = true,
+		["transparent"] = true,
+		["itemPlaceable"] = false,
+		["scripts"] = {},
+		["activated"] = false,
+		["connectedLogic"] = {},
+	},
+	[13] = {
+		["name"] = "Tight Slope",
+		["description"] = "A smooth gradient of rock that appears too narrow to fit through. Maybe something smaller could fit however?",
+		["icon"] = {
+			["text"] = ">",
+			["bg"] = colors.lightGray,
+			["fg"] = colors.black,
+		},
+		["passable"] = false,
+		["transparent"] = true,
+		["itemPlaceable"] = true,
+		["scripts"] = {},
+		["activated"] = false,
+		["connectedLogic"] = {},
+	},
+	[14] = {
+		["name"] = "Magical Wall",
+		["description"] = "A barrier from floor to ceiling that repels you if you are carrying anything. Drop it!",
+		["icon"] = {
+			["text"] = "#",
+			["bg"] = colors.blue,
+			["fg"] = colors.white,
+		},
+		["passable"] = false,
+		["transparent"] = false,
+		["itemPlaceable"] = false,
+		["scripts"] = {},
 	},
 	[100] = {
 		["name"] = "Exit Portal",
@@ -293,21 +360,22 @@ local tileTypes = {
 		},
 		["passable"] = true,
 		["transparent"] = true,
+		["itemPlaceable"] = false,
 		["perceptionRequirement"] = 99,
 		["scripts"] = {
-			["onLoad"] = function(tile,tx,ty,localArgs,map)
+			--[[["onLoad"] = function(tile,tx,ty,localArgs,map)
 				for k,v in pairs(localArgs["players"]) do
 					v.x = tx
 					v.y = ty
 				end
-			end,
+			end,]]--
 		},
 	}
 }
 
 local entityTypes = {
 	[0] = {
-		["name"] = "Rat",
+		--[[["name"] = "Rat",
 		["description"] = "Big, furry rat with blood red eyes",
 		["icon"] = {
 			["text"] = "R",
@@ -350,6 +418,13 @@ local entityTypes = {
 			["onSeePlayer"] = function()
 			
 			end,
+		}]]--
+		["name"] = "unused",
+		["description"] = "WOAAAAAAH how did u find me?!!?",
+		["icon"] = {
+			["text"] = "!",
+			["bg"] = colors.red,
+			["fg"] = colors.white,
 		}
 	},
 	[1] = {
@@ -361,7 +436,8 @@ local entityTypes = {
 			["fg"] = colors.white,
 		},
 		["scripts"] = {
-		}
+		},
+		["movedThisTick"] = false,
 	},
 	[2] = {
 		["name"] = "Rock",
@@ -370,7 +446,8 @@ local entityTypes = {
 			["text"] = "O",
 			["bg"] = colors.black,
 			["fg"] = colors.grey
-		}
+		},
+		["movedThisTick"] = false,
 	}
 }
 
@@ -389,7 +466,7 @@ tileTypes[4]["scripts"]["onPlayerMove"] = function(object,tileMap,entityMap,play
 	local returnData = {}
 	returnData["tileMap"] = {}
 	
-	if playerThatMoved.y+3 < object.y then
+	--[[if playerThatMoved.y+3 < object.y then
 		local returnTile = object
 		returnTile["passable"] = false
 		returnTile["transparent"] = false
@@ -401,7 +478,7 @@ tileTypes[4]["scripts"]["onPlayerMove"] = function(object,tileMap,entityMap,play
 		returnTile["name"] = "Locked Gate"
 		returnTile["description"] = "A tall, wooden gate criss crossed by steel bars."
 		table.insert(returnData.tileMap,returnTile)
-	end
+	end]]--
 	
 	return returnData
 end
@@ -410,7 +487,7 @@ tileTypes[5]["scripts"]["onPlayerMove"] = function(object,tileMap,entityMap,play
 	local returnData = {}
 	returnData["tileMap"] = {}
 	
-	if playerThatMoved.y+3 < object.y then
+	--[[if playerThatMoved.y+3 < object.y then
 		local returnTile = object
 		returnTile["passable"] = false
 		returnTile["transparent"] = false
@@ -422,7 +499,7 @@ tileTypes[5]["scripts"]["onPlayerMove"] = function(object,tileMap,entityMap,play
 		returnTile["name"] = "Locked Gate"
 		returnTile["description"] = "A tall, wooden gate criss crossed by steel bars."
 		table.insert(returnData.tileMap,returnTile)
-	end
+	end]]--
 	
 	return returnData
 end
@@ -430,6 +507,7 @@ end
 local function pressurePadLoad(object,tx,ty,localArgs,map)
 	object["gates"] = {}
 	object["magicalWalls"] = {}
+	object["pistons"] = {}
 	local tileMap = map.tileMap
 	for k,v in pairs(tileMap) do
 		for p,b in pairs(v) do
@@ -437,8 +515,9 @@ local function pressurePadLoad(object,tx,ty,localArgs,map)
 				table.insert(object["gates"],b)
 			elseif (b.type == 9) and b.metaData == object.metaData then
 				table.insert(object["magicalWalls"],b)
-			end
-			if object["name"] == "B.Pressure Pad" and b.metaData == object.metaData and b["connectedLogic"] then
+			elseif (b.type == 12) and math.floor(b.metaData/4) == object.metaData then
+				table.insert(object["pistons"],b)
+			elseif object["connectedLogic"] and b["connectedLogic"] and b.metaData == object.metaData then--object["name"] == "B.Pressure Pad" and b.metaData == object.metaData and b["connectedLogic"] then
 				table.insert(object["connectedLogic"],b)
 			end
 		end
@@ -462,13 +541,18 @@ local function pressurePadUpdate(object,map,players)
 	local B = true
 	if object["connectedLogic"] then
 		for k,v in pairs(object["connectedLogic"]) do
-			if (v["signal"] == false) or (v["signal"] == nil) then B = false break end
+			--print(v["name"])
+			if (v["signal"] == false) then B = false break end
 		end
+		--print(#object["connectedLogic"].." "..object["metaData"])
+		--sleep(0.1)
 	end
 	
 	if (entityMap[object.x][object.y] and entityMap[object.x][object.y]["name"]) or (players["localPlayer"]["x"] == object.x and players["localPlayer"]["y"] == object.y) then
 		object["signal"] = true
+		--if object["icon"] then object["icon"]["fg"] = colors.red end
 		if B then
+			--if object["icon"] then object["icon"]["fg"] = colors.lime end
 			--[[for k,v in pairs(tileMap) do
 				for p,b in pairs(v) do
 					if (b.type == 4) and b.metaData == object.metaData then
@@ -503,15 +587,15 @@ local function pressurePadUpdate(object,map,players)
 				local returnTile = b
 				returnTile["passable"] = true
 				returnTile["transparent"] = false
-				local a = math.random(1,2)
-				local bg = colors.pink
-				local fg = colors.yellow
+				local a = math.random(1,3)
+				local bg = colors.black
+				local fg = nil
 				if a == 1 then
-					bg = colors.lime
 					fg = colors.pink
 				elseif a == 2 then
-					bg = colors.blue
-					fg = colors.pink
+					fg = colors.blue
+				elseif a == 3 then
+					fg = colors.lime
 				end
 				returnTile["icon"] = {
 					["text"] = "*",
@@ -522,8 +606,60 @@ local function pressurePadUpdate(object,map,players)
 				returnTile["description"] = "Glittering dust covers the floor where the barrier once stood."
 				table.insert(returnData.tileMap,returnTile)
 			end
+			for p,b in pairs(object["pistons"]) do
+				local returnTile = b
+				returnTile["icon"]["bg"] = colors.red
+				returnTile["icon"]["fg"] = colors.yellow
+				returnTile["name"] = "Activated Piston"
+				returnTile["description"] = "An iron base fitted with an extended flat head."
+				
+				local dX = 0
+				local dY = 0
+				if b["metaData"]%4 == 0 then
+					dX = 1
+				elseif b["metaData"]%4 == 1 then
+					dY = -1
+				elseif b["metaData"]%4 == 2 then
+					dX = -1
+				elseif b["metaData"]%4 == 3 then
+					dY = 1
+				end
+				local x = b["x"] + dX
+				local y = b["y"] + dY
+				local x2 = x + dX
+				local y2 = y + dY
+				--[[print(entityMap[x][y])
+				print(entityMap[x2][y2])
+				sleep(0.5)]]--
+				--[[print(entityMap[x][y]["name"])
+				print(entityMap[x2][y2]["name"])]]--
+				--[[print(object["metaData"]%4)
+				print(x.." / "..y)
+				print(x2.." / "..y2)]]--
+				--sleep(0.5)
+				if entityMap[x] and entityMap[x][y] and entityMap[x][y]["name"] and entityMap[x2] and entityMap[x2][y2] and entityMap[x2][y2]["name"] == nil then
+					local function recursion(a,b)
+						for k,v in pairs(a) do
+							if type(v) == "table" then
+								b[k] = {}
+								recursion(v,b[k])
+							else
+								b[k] = v
+							end
+						end
+					end
+					--[[for k,v in pairs(entityMap[x][y]) do
+						entityMap[x2][y2][k] = v
+					end]]--
+					recursion(entityMap[x][y],entityMap[x2][y2])
+					entityMap[x][y] = {}
+				end
+				
+				table.insert(returnData.tileMap,returnTile)
+			end
 		end
 	else
+		--if object["icon"] then object["icon"]["fg"] = colors.blue end
 		object["signal"] = false
 		--[[for k,v in pairs(tileMap) do
 			for p,b in pairs(v) do
@@ -566,6 +702,14 @@ local function pressurePadUpdate(object,map,players)
 			}
 			returnTile["name"] = "Magical Wall"
 			returnTile["description"] = "A barrier from floor to ceiling crisscrossed with fast, fiery bands that look painful to touch."
+			table.insert(returnData.tileMap,returnTile)
+		end
+		for p,b in pairs(object["pistons"]) do
+			local returnTile = b
+			returnTile["icon"]["bg"] = colors.gray
+			returnTile["icon"]["fg"] = colors.white
+			returnTile["name"] = "Piston"
+			returnTile["description"] = "An iron base fitted with a flat head, it looks like it could push something."
 			table.insert(returnData.tileMap,returnTile)
 		end
 	end
@@ -629,10 +773,113 @@ tileTypes[100]["scripts"]["onUpdate"] = function(object,map,players)
 	return returnData
 end
 
-tileTypes[9]["scripts"]["onDraw"] = function(object,map,players)
+local function magicalWallDraw(object,map,players)
 	if object["name"] == "Magical Wall" then
 		object["icon"]["text"] = string.char(math.random(20,120))
 	end
+end
+
+tileTypes[9]["scripts"]["onDraw"] = function(object,map,players)
+	magicalWallDraw(object,map,players)
+end
+
+tileTypes[14]["scripts"]["onDraw"] = function(object,map,players)
+	magicalWallDraw(object,map,players)
+end
+
+tileTypes[14]["scripts"]["onUpdate"] = function(object,map,players)
+	if players["localPlayer"]["carrying"] then
+		object["passable"] = false
+	else
+		object["passable"] = true
+	end
+end
+
+local function directionalLoad(object,tx,ty,localArgs,map)
+	local v = map["tileMap"][tx][ty]
+	local returnValue = {
+		["object"] = {
+			["icon"] = v["icon"]
+		}
+	}
+	--[[print(returnValue["object"]["icon"])
+	sleep(0.1)]]--
+	if v["metaData"]%4 == 0 then
+		returnValue["object"]["icon"]["text"] = ">"
+	elseif v["metaData"]%4 == 1 then
+		returnValue["object"]["icon"]["text"] = "^"
+	elseif v["metaData"]%4 == 2 then
+		returnValue["object"]["icon"]["text"] = "<"
+	elseif v["metaData"]%4 == 3 then
+		returnValue["object"]["icon"]["text"] = "V"
+	end
+	return returnValue
+end
+
+tileTypes[11]["scripts"]["onLoad"] = function(object,tx,ty,localArgs,map)
+	return directionalLoad(object,tx,ty,localArgs,map)
+end
+
+tileTypes[13]["scripts"]["onLoad"] = function(object,tx,ty,localArgs,map)
+	return directionalLoad(object,tx,ty,localArgs,map)
+end
+
+local function slopeUpdate(object,map,players)
+	local returnData = {}
+	returnData.tileMap = {}
+	local tileMap = map.tileMap
+	local entityMap = map.entityMap
+	
+	local dX = 0
+	local dY = 0
+	if object["metaData"] == 0 then
+		dX = 1
+	elseif object["metaData"] == 1 then
+		dY = -1
+	elseif object["metaData"] == 2 then
+		dX = -1
+	elseif object["metaData"] == 3 then
+		dY = 1
+	end
+	local x = object.x + dX
+	local y = object.y + dY
+	if tileMap[x] and tileMap[x][y] and tileMap[x][y]["passable"] == true and entityMap[x] and entityMap[x][y] and (entityMap[x][y]["name"] == nil) then
+		if players["localPlayer"]["x"] == object.x and players["localPlayer"]["y"] == object.y then
+			if players["localPlayer"]["movedThisTick"] == false then
+				players["localPlayer"]["movedThisTick"] = true
+				players["localPlayer"]:move(dX,dY)
+			end
+		elseif entityMap[object.x] and entityMap[object.x][object.y] and entityMap[object.x][object.y]["name"] then --and entityMap[object.x][object.y]["movedThisTick"] == false then
+			if entityMap[object.x][object.y]["movedThisTick"] == false then
+				--[[if entityMap[object.x][object.y]["icon"] then
+					entityMap[object.x][object.y]["icon"]["text"] = string.char(math.random(20,21))
+				end]]--
+				entityMap[x][y] = {}
+				entityMap[object.x][object.y]["movedThisTick"] = true
+				for k,v in pairs(entityMap[object.x][object.y]) do
+					entityMap[x][y][k] = v
+				end
+				entityMap[object.x][object.y] = {}
+			elseif entityMap[object.x][object.y]["movedThisTick"] == true then
+				--[[if entityMap[object.x][object.y]["icon"] then
+					entityMap[object.x][object.y]["icon"]["text"] = string.char(math.random(22,23))
+				end]]--
+			end
+		end
+	end
+	return returnData
+end
+
+tileTypes[11]["scripts"]["onUpdate"] = function(object,map,players)
+	return slopeUpdate(object,map,players)
+end
+
+tileTypes[13]["scripts"]["onUpdate"] = function(object,map,players)
+	return slopeUpdate(object,map,players)
+end
+
+tileTypes[12]["scripts"]["onLoad"] = function(object,tx,ty,localArgs,map)
+	return directionalLoad(object,tx,ty,localArgs,map)
 end
 	
 objectManager.loadTileTypes = function()
