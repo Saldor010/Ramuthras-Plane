@@ -887,7 +887,7 @@ function cobalt.mousepressed( x, y, button )
 					if entityTypes[tonumber(mapmaker.GUI.IDField.text)] then
 						if map.entityMap[lastMouse.x+lastMouse.cx] and map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] then
 							local object = map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy]
-							for k,v in pairs(tileTypes[tonumber(mapmaker.GUI.IDField.text)]) do
+							for k,v in pairs(entityTypes[tonumber(mapmaker.GUI.IDField.text)]) do
 								object[k] = v
 							end
 							object.x = lastMouse.x+lastMouse.cx
@@ -905,9 +905,7 @@ function cobalt.mousepressed( x, y, button )
 				end
 			end
 		end
-	end
-	
-	if application == "rmplane" then
+	elseif application == "rmplane" then
 		if x > 0 and x <= camera.xSize and y > 0 and y <= camera.ySize then
 			if map.entityMap[lastMouse.x+lastMouse.cx] and map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] and map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy].name then
 				if button == 2 then
@@ -915,7 +913,7 @@ function cobalt.mousepressed( x, y, button )
 					rmplane.GUI.inspectPanel.nameLabel.text = object.name
 					rmplane.GUI.inspectPanel.descriptionLabel.text = object.description
 				elseif button == 1 then
-					if not players["localPlayer"]["carrying"] and distanceOK(players["localPlayer"]["x"],players["localPlayer"]["y"],lastMouse.x+lastMouse.cx,lastMouse.y+lastMouse.cy) then
+					if not players["localPlayer"]["carrying"] and distanceOK(players["localPlayer"]["x"],players["localPlayer"]["y"],lastMouse.x+lastMouse.cx,lastMouse.y+lastMouse.cy) and map.tileMap[players["localPlayer"]["x"]][players["localPlayer"]["y"]]["itemPlaceable"] then
 						players["localPlayer"]["carrying"] = {}
 						for k,v in pairs(map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy]) do
 							players["localPlayer"]["carrying"][k] = v
