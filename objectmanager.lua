@@ -581,6 +581,7 @@ local function pressurePadUpdate(object,map,players)
 				}
 				returnTile["name"] = "Open Gate"
 				returnTile["description"] = "A tall, wooden gate criss crossed by steel bars. It appears to be open."
+				returnTile["itemPlaceable"] = true
 				table.insert(returnData.tileMap,returnTile)
 			end
 			for p,b in pairs(object["magicalWalls"]) do
@@ -604,6 +605,7 @@ local function pressurePadUpdate(object,map,players)
 				}
 				returnTile["name"] = "Magical Dust"
 				returnTile["description"] = "Glittering dust covers the floor where the barrier once stood."
+				returnTile["itemPlaceable"] = true
 				table.insert(returnData.tileMap,returnTile)
 			end
 			for p,b in pairs(object["pistons"]) do
@@ -689,6 +691,7 @@ local function pressurePadUpdate(object,map,players)
 			}
 			returnTile["name"] = "Locked Gate"
 			returnTile["description"] = "A tall, wooden gate criss crossed by steel bars."
+			returnTile["itemPlaceable"] = false
 			table.insert(returnData.tileMap,returnTile)
 		end
 		for p,b in pairs(object["magicalWalls"]) do
@@ -702,6 +705,7 @@ local function pressurePadUpdate(object,map,players)
 			}
 			returnTile["name"] = "Magical Wall"
 			returnTile["description"] = "A barrier from floor to ceiling crisscrossed with fast, fiery bands that look painful to touch."
+			returnTile["itemPlaceable"] = false
 			table.insert(returnData.tileMap,returnTile)
 		end
 		for p,b in pairs(object["pistons"]) do
