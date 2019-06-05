@@ -2,9 +2,12 @@
 -- By Saldor010
 local cobalt = dofile("cobalt")
 cobalt.ui = dofile("cobalt-ui/init.lua")
+local json = dofile(fs.getDir(shell.getRunningProgram()).."/json.lua")
+--local lualzw = dofile(fs.getDir(shell.getRunningProgram()).."/lualzw.lua")
 
 local musicInstance = {}
 local soundInstance = {}
+local workingPath = nil
 
 local args = {...}
 local application = "rmplane"
@@ -21,7 +24,29 @@ lastMouse.x = 0
 lastMouse.y = 0
 lastMouse.cx = 0
 lastMouse.cy = 0
+local shiftHeld = false
+local selection = {
+	["a"] = nil,
+	["b"] = nil,
+}
 
+local players = {}
+local map = {
+	["name"] = "",
+	["xSize"] = 10,
+	["ySize"] = 10,
+	["tileMap"] = {},
+	["tileMapMemory"] = {},
+	["entityMap"] = {},
+	["entityMapMemory"] = {},
+	["binds"] = {},
+}
+local camera = {
+	["x"] = 0,
+	["y"] = 0,
+	["xSize"] = 35,
+	["ySize"] = 15,
+}
 local levels = {
 	[1] = "level1.rpmap",
 	[2] = "level2.rpmap",
@@ -116,26 +141,123 @@ local mapmaker = {}
 mapmaker.GUI = {}
 
 mapmaker.GUI.IDType = "tile"
-mapmaker.GUI.IDPanel = cobalt.ui.new({x=37,y=2,w=12,h=5,backColour = nil,state="game"})
-mapmaker.GUI.IDField = mapmaker.GUI.IDPanel:add("input",{w=12,h=1,y=1,placeholder="Tile ID",state="game"})
-mapmaker.GUI.IDTileButton = mapmaker.GUI.IDPanel:add("button",{w=12,h=1,y=2,text="Tile",state="game"})
-mapmaker.GUI.IDEntityButton = mapmaker.GUI.IDPanel:add("button",{w=12,h=1,y=3,text="Entity",state="game",state="game"})
-mapmaker.GUI.IDMetaDataField = mapmaker.GUI.IDPanel:add("input",{w=12,h=1,y=4,placeholder="Metadata",state="game"})
-mapmaker.GUI.IDDeleteButton = mapmaker.GUI.IDPanel:add("button",{w=12,h=1,y=5,text="DELETE",backColour=colors.red,state="game"})
+mapmaker.GUI.IDPanel = cobalt.ui.new({x=37,y=2,w=14,h=6,backColour = nil,state="game"})
+mapmaker.GUI.IDField = mapmaker.GUI.IDPanel:add("input",{w=14,h=1,y=1,placeholder="Tile ID",state="game"})
+mapmaker.GUI.IDTileButton = mapmaker.GUI.IDPanel:add("button",{w=14,h=1,y=2,text="Tile",state="game"})
+mapmaker.GUI.IDEntityButton = mapmaker.GUI.IDPanel:add("button",{w=14,h=1,y=3,text="Entity",state="game",state="game"})
+mapmaker.GUI.IDMetaDataField = mapmaker.GUI.IDPanel:add("input",{w=14,h=1,y=4,placeholder="Metadata",state="game"})
+mapmaker.GUI.IDDeleteButton = mapmaker.GUI.IDPanel:add("button",{w=14,h=1,y=5,text="DELETE",backColour=colors.red,state="game"})
+mapmaker.GUI.IDToggleMetaData = mapmaker.GUI.IDPanel:add("button",{w=14,h=1,y=6,text="View Metadata",backColour=colors.cyan,state="game"})
+
+mapmaker.GUI.Panel = cobalt.ui.new({x=37,y=13,w=14,h=1,backColour = nil,state="game"})
+mapmaker.GUI.TestLevel = mapmaker.GUI.Panel:add("button",{w=14,h=1,y=1,text="Test Level",backColour=colors.cyan,state="game"})
+
+local function doOnSelection(f)
+	local dx = selection["cornerB"]["x"]-selection["cornerA"]["x"]
+	local dy = selection["cornerB"]["y"]-selection["cornerA"]["y"]
+	local a = 1
+	local b = 1
+	if dx < 0 then a = -1 end
+	if dy < 0 then b = -1 end
+	for i=0,dx,a do
+		for j=0,dy,b do
+			local x = selection["cornerA"]["x"]+i
+			local y = selection["cornerA"]["y"]+j
+			f(x,y)
+		end
+	end
+end
+
+local function spawnTile(x,y)
+	if tileTypes[tonumber(mapmaker.GUI.IDField.text)] then
+		if map.tileMap[x] and map.tileMap[x][y] then
+			local object = map.tileMap[x][y]
+			for k,v in pairs(tileTypes[tonumber(mapmaker.GUI.IDField.text)]) do
+				object[k] = v
+			end
+			object["x"] = x
+			object["y"] = y
+			object["type"] = tonumber(mapmaker.GUI.IDField.text) or 0
+			object["metaData"] = tonumber(mapmaker.GUI.IDMetaDataField.text) or 0
+		end
+	end
+end
+
+local function spawnEntity(x,y)
+	if entityTypes[tonumber(mapmaker.GUI.IDField.text)] then
+		if map.entityMap[x] and map.entityMap[x][y] then
+			local object = map.entityMap[x][y]
+			for k,v in pairs(entityTypes[tonumber(mapmaker.GUI.IDField.text)]) do
+				object[k] = v
+			end
+			object["x"] = x
+			object["y"] = y
+			object["type"] = tonumber(mapmaker.GUI.IDField.text) or 0
+			object["metaData"] = tonumber(mapmaker.GUI.IDMetaDataField.text) or 0
+		end
+	end
+end
 
 mapmaker.GUI.IDTileButton.onclick = function()
-	mapmaker.GUI.IDType = "tile"
-	mapmaker.GUI.IDField.placeholder = "Tile ID"
+	if selection["cornerA"] and selection["cornerB"] then
+		doOnSelection(function(x,y)
+			spawnTile(x,y)
+		end)
+		selection["cornerA"] = nil
+		selection["cornerB"] = nil
+	else
+		mapmaker.GUI.IDType = "tile"
+		mapmaker.GUI.IDField.placeholder = "Tile ID"
+		mapmaker.GUI.IDTileButton["backColour"] = colors.blue
+		mapmaker.GUI.IDEntityButton["backColour"] = colors.cyan
+		mapmaker.GUI.IDDeleteButton["backColour"] = colors.red
+	end
 end
 
 mapmaker.GUI.IDEntityButton.onclick = function()
-	mapmaker.GUI.IDType = "entity"
-	mapmaker.GUI.IDField.placeholder = "Entity ID"
+	if selection["cornerA"] and selection["cornerB"] then
+		doOnSelection(function(x,y)
+			spawnEntity(x,y)
+		end)
+		selection["cornerA"] = nil
+		selection["cornerB"] = nil
+	else
+		mapmaker.GUI.IDType = "entity"
+		mapmaker.GUI.IDField.placeholder = "Entity ID"
+		mapmaker.GUI.IDTileButton["backColour"] = colors.cyan
+		mapmaker.GUI.IDEntityButton["backColour"] = colors.blue
+		mapmaker.GUI.IDDeleteButton["backColour"] = colors.red
+	end
 end
 
 mapmaker.GUI.IDDeleteButton.onclick = function()
-	mapmaker.GUI.IDType = "delete"
-	mapmaker.GUI.IDField.placeholder = "..."
+	if selection["cornerA"] and selection["cornerB"] then
+		doOnSelection(function(x,y)
+			if map.entityMap[x] and map.entityMap[x][y] and map.entityMap[x][y].name then
+				map.entityMap[x][y] = {}
+			elseif map.tileMap[x] and map.tileMap[x][y] and map.tileMap[x][y].name then
+				map.tileMap[x][y] = {}
+			end
+		end)
+		selection["cornerA"] = nil
+		selection["cornerB"] = nil
+	else
+		mapmaker.GUI.IDType = "delete"
+		mapmaker.GUI.IDField.placeholder = "..."
+		mapmaker.GUI.IDTileButton["backColour"] = colors.cyan
+		mapmaker.GUI.IDEntityButton["backColour"] = colors.cyan
+		mapmaker.GUI.IDDeleteButton["backColour"] = colors.blue
+	end
+end
+
+local viewMetaData = false
+mapmaker.GUI.IDToggleMetaData.onclick = function()
+	viewMetaData = not viewMetaData
+	if viewMetaData then
+		mapmaker.GUI.IDToggleMetaData["backColour"] = colors.blue
+	else
+		mapmaker.GUI.IDToggleMetaData["backColour"] = colors.cyan
+	end
 end
 
 mapmaker.GUI.saveButtonPanel = cobalt.ui.new({x=1,y=19,w=6,h=1,state="game"})
@@ -149,9 +271,9 @@ mapmaker.GUI.saveButton = mapmaker.GUI.saveButtonPanel:add("button",{text="Save"
 mapmaker.paint = {}
 mapmaker.paint.Selection = nil
 
-mapmaker.GUI.inspectPanel = cobalt.ui.new({x=37,y=8,w=12,h=3,backColour=colors.black,state="game"})
-mapmaker.GUI.inspectPanelName = mapmaker.GUI.inspectPanel:add("text",{x=1,y=1,w=12,h=2,text="",foreColour=colors.white,state="game"})
-mapmaker.GUI.inspectPanelMetaData = mapmaker.GUI.inspectPanel:add("text",{x=1,y=3,w=12,h=1,text="",foreColour=colors.white,state="game"})
+mapmaker.GUI.inspectPanel = cobalt.ui.new({x=37,y=9,w=14,h=3,backColour=colors.black,state="game"})
+mapmaker.GUI.inspectPanelName = mapmaker.GUI.inspectPanel:add("text",{x=1,y=1,w=14,h=2,text="",foreColour=colors.white,state="game"})
+mapmaker.GUI.inspectPanelMetaData = mapmaker.GUI.inspectPanel:add("text",{x=1,y=3,w=14,h=1,text="",foreColour=colors.white,state="game"})
 
 local mainMenuColor = colors.red
 
@@ -179,7 +301,21 @@ mainMenuGUI.PlayIntroButton.onclick = function()
 	cobalt.state = "intro"
 end
 
-local players = {}
+local loadingLevelGUI = {}
+loadingLevelGUI.Panel = cobalt.ui.new({x=1,y=1,w=wD,h=hT,backColour = colors.black,state="loadingLevel"})
+loadingLevelGUI.Title = loadingLevelGUI.Panel:add("text",{w=wD,h=4,y=6,x=1,wrap="center",text="Loading level",backColour=colors.black,foreColour=mainMenuColor,state="loadingLevel"})
+loadingLevelGUI.LevelTitle = loadingLevelGUI.Panel:add("text",{w=wD,h=4,y=8,x=1,wrap="center",text="defaultlevel",backColour=colors.black,foreColour=cobalt.g.lighten(mainMenuColor),state="loadingLevel"})
+loadingLevelGUI.LegacyTitle = loadingLevelGUI.Panel:add("text",{w=wD,h=4,y=12,x=1,wrap="center",text="",backColour=colors.black,foreColour=cobalt.g.lighten(mainMenuColor),state="loadingLevel"})
+loadingLevelGUI.LoadingBar = loadingLevelGUI.Panel:add("button",{w="0%",h=1,y=10,x="25%",text="",enabled=false,backColour=mainMenuColor,foreColour=cobalt.g.lighten(mainMenuColor),state="loadingLevel"})
+
+local function cobalt_draw()
+	if cobalt.application.view then 
+		cobalt.application.view:clear(" ", cobalt.application.backColour, cobalt.application.foreColour ); 
+	end cobalt.draw(); 
+	if cobalt.application.view then 
+		cobalt.application.view:render() 
+	end
+end
 
 local levelGUI = {}
 levelGUI.Panel = cobalt.ui.new({x=1,y=1,w=wD,h=hT,backColour = colors.black,state="levels"})
@@ -224,15 +360,15 @@ end
 
 if application ~= "mapmaker" then
 	for k,v in pairs(mapmaker.GUI) do
-		if v.x then v.x = -100 end
-		if v.y then v.y = -100 end
+		if v.x then v.x = v.x - 100 end
+		if v.y then v.y = v.y - 100 end
 	end
 end
 
 if application ~= "rmplane" then
 	for k,v in pairs(rmplane.GUI) do
-		if v.x then v.x = -100 end
-		if v.y then v.y = -100 end
+		if v.x then v.x = v.x - 100 end
+		if v.y then v.y = v.y - 100 end
 	end
 end
 
@@ -289,24 +425,6 @@ players = {
 	}
 }
 
-local map = {
-	["name"] = "",
-	["xSize"] = 10,
-	["ySize"] = 10,
-	["tileMap"] = {},
-	["tileMapMemory"] = {},
-	["entityMap"] = {},
-	["entityMapMemory"] = {},
-	["binds"] = {},
-}
-
-local camera = {
-	["x"] = 0,
-	["y"] = 0,
-	["xSize"] = 35,
-	["ySize"] = 15,
-}
-
 local lastTick = os.time()
 
 local function findTile(x,y)
@@ -330,94 +448,208 @@ for k,v in pairs(players) do
 	v.faction = factions.champions
 end
 
-local function loadMap(file)
+local function loadLegacyMap(file)
+	local handle = fs.open(file,"r")
+	local loadedMap = {["entityMap"]={},["tileMap"]={},["entityMapMemory"] = {},["tileMapMemory"] = {}}
+	local ct = 0
+	local maxCt = 0
+	local ctRate = math.floor(maxCt/20)
+	while true do
+		local line = handle.readLine()
+		if not line then break else
+			maxCt = maxCt + 1
+		end
+	end
+	handle.close()
+	handle = fs.open(file,"r")
+	while true do
+		local line = handle.readLine()
+		if not line then break else
+			ct = ct + 1
+			if ct == 1 then
+				loadedMap.name = line
+			elseif ct == 2 then
+				loadedMap.xSize = tonumber(line)
+				for i=1,tonumber(line) do
+					loadedMap["entityMap"][i] = {}
+					loadedMap["tileMap"][i] = {}
+					loadedMap["entityMapMemory"][i] = {}
+					loadedMap["tileMapMemory"][i] = {}
+				end
+			elseif ct == 3 then
+				loadedMap.ySize = tonumber(line)
+				for i=1,loadedMap.xSize do
+					for j=1,tonumber(line) do
+						loadedMap["entityMap"][i][j] = {}
+						loadedMap["tileMap"][i][j] = {}
+						loadedMap["entityMapMemory"][i] = {}
+						loadedMap["tileMapMemory"][i] = {}
+					end
+				end
+			else
+				local tile = {}
+				tile.x = tonumber("0x"..string.sub(line,1,2))
+				tile.y = tonumber("0x"..string.sub(line,3,4))
+				tile.type = tonumber("0x"..string.sub(line,5,7))
+				tile.metaData = tonumber("0x"..string.sub(line,8,9))
+				local whereTo = tonumber("0x"..string.sub(line,10,10))
+				local ct = 0
+				local function recursion(a,b)
+					ct = ct + 1
+					--print(ct)
+					for k,v in pairs(a) do
+						if ct > 400 then
+							--print(k)
+							--sleep(0.1)
+						end
+						--sleep()
+						if type(v) == "table" then
+							b[k] = {}
+							recursion(v,b[k])
+						else
+							b[k] = v
+						end
+					end
+				end
+				if whereTo == 0 then
+					if tileTypes[tile.type] then
+						recursion(tileTypes[tile.type],tile)
+						--[[for k,v in pairs(tileTypes[tile.type]) do
+							tile[k] = v
+						end]]--
+					end
+					loadedMap["tileMap"][tile.x][tile.y] = tile
+				elseif whereTo == 1 then
+					if entityTypes[tile.type] then
+						recursion(entityTypes[tile.type],tile)
+						--[[for k,v in pairs(entityTypes[tile.type]) do
+							tile[k] = v
+						end]]--
+					end
+					loadedMap["entityMap"][tile.x][tile.y] = tile
+				else
+					error("Malformed map file")
+				end
+			end
+			
+			if ct % ctRate == 0 then
+				--loadingLevelGUI.LoadingBar["w"] = tostring(math.ceil((ct/maxCt)*50)).."%"
+				loadingLevelGUI.LoadingBar:resize(tostring(math.ceil((ct/maxCt)*25)).."%",1)
+				--print(tostring(math.ceil((ct/maxCt)*50)).."%")
+				--sleep(1)
+				cobalt.draw()
+			end
+		end
+	end
+	handle.close()
+	return loadedMap
+end
+
+local function loadMap(file,overwrite)
+	cobalt.state = "loadingLevel"
+	loadingLevelGUI.LevelTitle.text = file
+	loadingLevelGUI.LoadingBar:resize(1,1)
+	cobalt_draw()
 	map.tileMap = {}
 	map.entityMap = {}
 	if fs.exists(file) then
 		local handle = fs.open(file,"r")
-		local loadedMap = {["entityMap"]={},["tileMap"]={},["entityMapMemory"] = {},["tileMapMemory"] = {}}
-		local ct = 0
-		while true do
-			local line = handle.readLine()
-			if not line then break else 
-				ct = ct + 1
-				if ct == 1 then
-					loadedMap.name = line
-				elseif ct == 2 then
-					loadedMap.xSize = tonumber(line)
-					for i=1,tonumber(line) do
-						loadedMap["entityMap"][i] = {}
-						loadedMap["tileMap"][i] = {}
-						loadedMap["entityMapMemory"][i] = {}
-						loadedMap["tileMapMemory"][i] = {}
-					end
-				elseif ct == 3 then
-					loadedMap.ySize = tonumber(line)
-					for i=1,loadedMap.xSize do
-						for j=1,tonumber(line) do
-							loadedMap["entityMap"][i][j] = {}
-							loadedMap["tileMap"][i][j] = {}
-							loadedMap["entityMapMemory"][i] = {}
-							loadedMap["tileMapMemory"][i] = {}
-						end
-					end
-				else
-					local tile = {}
-					tile.x = tonumber("0x"..string.sub(line,1,2))
-					tile.y = tonumber("0x"..string.sub(line,3,4))
-					tile.type = tonumber("0x"..string.sub(line,5,7))
-					tile.metaData = tonumber("0x"..string.sub(line,8,9))
-					local whereTo = tonumber("0x"..string.sub(line,10,10))
-					local ct = 0
-					local function recursion(a,b)
-						ct = ct + 1
-						--print(ct)
-						for k,v in pairs(a) do
-							if ct > 400 then
-								--print(k)
-								--sleep(0.1)
-							end
-							--sleep()
-							if type(v) == "table" then
-								b[k] = {}
-								recursion(v,b[k])
-							else
-								b[k] = v
-							end
-						end
-					end
-					if whereTo == 0 then
-						if tileTypes[tile.type] then
-							recursion(tileTypes[tile.type],tile)
-							--[[for k,v in pairs(tileTypes[tile.type]) do
-								tile[k] = v
-							end]]--
-						end
-						loadedMap["tileMap"][tile.x][tile.y] = tile
-					elseif whereTo == 1 then
-						if entityTypes[tile.type] then
-							recursion(entityTypes[tile.type],tile)
-							--[[for k,v in pairs(entityTypes[tile.type]) do
-								tile[k] = v
-							end]]--
-						end
-						loadedMap["entityMap"][tile.x][tile.y] = tile
-					else
-						error("Malformed map file")
-					end
+		local line = handle.readLine()
+		if line == nil then
+			handle.close()
+			loadingLevelGUI.LegacyTitle.text = "Cannot load file, corrupted or otherwise incompatible!"
+			cobalt_draw()
+			sleep(5)
+			return false
+		end
+		if string.sub(line,1,8) == "-rpmap.v" then
+			--print(lualzw.decompress(handle.readAll()))
+			--sleep(2)
+			local loadedMap = json.decode(handle.readAll())
+			handle.close()
+			map["xSize"] = loadedMap["levelSize"]["x"]
+			map["ySize"] = loadedMap["levelSize"]["y"]
+			for i=1,loadedMap["levelSize"]["x"] do
+				map["entityMap"][i] = {}
+				map["tileMap"][i] = {}
+				map["entityMapMemory"][i] = {}
+				map["tileMapMemory"][i] = {}
+				for j=1,loadedMap["levelSize"]["y"] do
+					--print("YES")
+					--sleep(1)
+					map["entityMap"][i][j] = {}
+					map["tileMap"][i][j] = {}
+					map["entityMapMemory"][i][j] = {}
+					map["tileMapMemory"][i][j] = {}
 				end
 			end
+			local function recursion(a,b)
+				for k,v in pairs(a) do
+					if type(v) == "table" then
+						b[k] = {}
+						recursion(v,b[k])
+					else
+						--print(k)
+						--sleep(0.5)
+						b[k] = v
+					end
+				end
+			end		
+			for k,v in pairs(loadedMap["entityMap"]) do
+				map["entityMap"][ tonumber(v["x"]) ][ tonumber(v["y"]) ] = {
+					["x"] = tonumber(v["x"]),
+					["y"] = tonumber(v["y"]),
+					["type"] = tonumber(v["type"]),
+					["metaData"] = tonumber(v["metaData"]),
+				}
+				if entityTypes[tonumber(v["type"])] then
+					--print(tonumber(v["type"]))
+					--sleep(1)
+					recursion(entityTypes[tonumber(v["type"])],map["entityMap"][ tonumber(v["x"]) ][ tonumber(v["y"]) ])
+				end
+			end
+			for k,v in pairs(loadedMap["tileMap"]) do
+				for i=1,tonumber(v["l"]) do
+					local y = i-1
+					local x = 0
+					while y > map["ySize"] do
+						x = x + 1
+						y = y - map["ySize"]
+					end
+					map["tileMap"][ tonumber(v["x"]) + x ][ tonumber(v["y"]) + y ] = {
+						["x"] = tonumber(v["x"]) + x,
+						["y"] = tonumber(v["y"]) + y,
+						["type"] = tonumber(v["type"]),
+						["metaData"] = tonumber(v["metaData"]),
+					}
+					if tileTypes[tonumber(v["type"])] then
+						recursion(tileTypes[tonumber(v["type"])],map["tileMap"][ tonumber(v["x"]) + x ][ tonumber(v["y"]) + y ])
+					end
+				end
+				--[[print(tonumber(v["x"]))
+				print(tonumber(v["y"]))
+				print(tonumber(v["type"]))
+				print(tonumber(v["metaData"]))]]--
+				--sleep(3)
+			end
+		else
+			loadingLevelGUI.LegacyTitle.text = "Loading legacy map, make sure to update!"
+			cobalt_draw()
+			handle.close()
+			map = loadLegacyMap(file)
 		end
-		handle.close()
-		map = loadedMap
 		map["scriptBinds"] = {
 			["onPlayerMove"] = {},
 			["onUpdate"] = {},
 			["onDraw"] = {},
 		}
 		
+		local ct = 0
+		local maxCt = map.xSize * map.ySize
+		local ctRate = math.floor(maxCt/20)
 		for i=1,map.xSize do
 			for j=1,map.ySize do
+				ct = ct + 1
 				if map["tileMap"][i][j] then
 					if map["tileMap"][i][j].scripts and map["tileMap"][i][j].scripts.onLoad then
 						local localArgs = map["tileMap"][i][j].scripts.onLoad(map["tileMap"][i][j],i,j,{
@@ -462,6 +694,10 @@ local function loadMap(file)
 						table.insert(map["scriptBinds"]["onDraw"],map["entityMap"][i][j])
 					end
 				end
+				if ct % ctRate == 0 then
+					loadingLevelGUI.LoadingBar:resize(tostring(math.ceil((ct/maxCt)*25)+25).."%",1)
+					cobalt_draw()
+				end
 			end
 		end
 		
@@ -472,12 +708,33 @@ local function loadMap(file)
 		--while camera.y+camera.ySize > map.ySize do camera.y = camera.y - 1 end
 		--while camera.x < 0 do camera.x = camera.x + 1 end
 		--while camera.y < 0 do camera.y = camera.y + 1 end
+	elseif overwrite == true then
+		map["xSize"] = 255
+		map["ySize"] = 255
+		for i=1,255 do
+			map["entityMap"][i] = {}
+			map["tileMap"][i] = {}
+			map["entityMapMemory"][i] = {}
+			map["tileMapMemory"][i] = {}
+			for j=1,255 do
+				--print("YES")
+				--sleep(1)
+				map["entityMap"][i][j] = {}
+				map["tileMap"][i][j] = {}
+				map["entityMapMemory"][i][j] = {}
+				map["tileMapMemory"][i][j] = {}
+			end
+		end
+		--[[local player = players["localPlayer"]
+		camera.x = player.x-math.floor(camera.xSize/2)
+		camera.y = player.y-math.floor(camera.ySize/2)]]--
 	else
 		error("No such map "..file.." exists")
 	end
+	cobalt.state = "game"
 end
 
-local function saveMap(filePath,name,mapX,mapY)
+local function saveLegacyMap(filePath,name,mapX,mapY)
 	--if fs.exists(filePath) then return false else
 		local handle = fs.open(filePath,"w")
 		handle.writeLine(name)
@@ -523,6 +780,77 @@ local function saveMap(filePath,name,mapX,mapY)
 	--end
 end
 
+local function saveMap(filePath,name,mapX,mapY)
+	--if fs.exists(filePath) then return false else
+		local handle = fs.open(filePath,"w")
+		local A = {
+			["levelName"] = name,
+			["levelSize"] = {
+				["x"] = mapX,
+				["y"] = mapY,
+			},
+			["tileMap"] = {},
+			["entityMap"] = {},
+		}
+		local currentEntry = nil
+		for i=1,map["xSize"] do
+			for j=1,map["ySize"] do
+				if map["tileMap"][i] then
+					local b = map["tileMap"][i][j]
+					if currentEntry then
+						if b and b["type"] then
+							if tostring(b["type"]) == currentEntry["type"] and tostring(b["metaData"]) == currentEntry["metaData"] then
+								currentEntry["l"] = currentEntry["l"] + 1
+							else
+								table.insert(A["tileMap"],currentEntry)
+								currentEntry = {
+									["x"] = tostring(i),
+									["y"] = tostring(j),
+									["type"] = tostring(b["type"]),
+									["metaData"] = tostring(b["metaData"]),
+									["l"] = 1,
+								}
+							end
+						else
+							table.insert(A["tileMap"],currentEntry)
+							currentEntry = nil
+						end
+					else
+						if b and b["type"] then
+							currentEntry = {
+								["x"] = tostring(i),
+								["y"] = tostring(j),
+								["type"] = tostring(b["type"]),
+								["metaData"] = tostring(b["metaData"]),
+								["l"] = 1,
+							}
+						end
+					end
+				end
+			end
+		end
+		if currentEntry then
+			table.insert(A["tileMap"],currentEntry)
+		end
+		for i,v in pairs(map["entityMap"]) do
+			for j,b in pairs(v) do
+				if b and b["type"] then
+					table.insert(A["entityMap"],{
+						["x"] = tostring(i),
+						["y"] = tostring(j),
+						["type"] = tostring(b["type"]),
+						["metaData"] = tostring(b["metaData"]),
+					})
+				end
+			end
+		end
+		handle.writeLine("-rpmap.v1.0-")
+		handle.write(json.encode(A))
+		handle.close()
+		return true
+	--end
+end
+
 function loadLevel(level)
 	if fs.getDir(shell.getRunningProgram()).."/maps/"..levels[level] then
 		currentLevel = level
@@ -556,31 +884,71 @@ for i=1,3 do
 	end
 end
 
-local workingPath = nil
-if application == "mapmaker" then
-	local a = nil
-	if fs.exists(fs.getDir(shell.getRunningProgram()).."/maps/"..args[1]) then
-		a = fs.getDir(shell.getRunningProgram()).."/maps/"..args[1]
-	elseif fs.exists(fs.getDir(shell.getRunningProgram()).."/maps/"..args[1]..".rpmap") then
-		a = fs.getDir(shell.getRunningProgram()).."/maps/"..args[1]..".rpmap"
-	end
-	if a == nil then
-		print(fs.getDir(shell.getRunningProgram()).."/maps/"..args[1]..".rpmap")
-		local handle = fs.open(fs.getDir(shell.getRunningProgram()).."/maps/"..args[1]..".rpmap","w")
-		handle.writeLine(args[1])
-		handle.writeLine(255)
-		handle.writeLine(255)
-		handle.close()
-		workingPath = fs.getDir(shell.getRunningProgram()).."/maps/"..args[1]..".rpmap"
-		loadMap(fs.getDir(shell.getRunningProgram()).."/maps/"..args[1]..".rpmap")
-	else
-		workingPath = a
-		loadMap(a)
-	end
-end
-
 mapmaker.GUI.saveButton.onclick = function()
 	saveMap(workingPath,args[1],255,255)
+end
+
+mapmaker.GUI.TestLevel.onclick = function()
+	cobalt.state = "loadingLevel"
+	loadingLevelGUI.LevelTitle.text = args[1]
+	cobalt_draw()
+	
+	saveMap(fs.getDir(shell.getRunningProgram()).."/maps/autosave.rpmap",map["name"],map["xSize"],map["ySize"])
+	
+	application = "rmplane"
+	players["localPlayer"]["finishedLevel"] = false
+	players["localPlayer"]["icon"]["text"] = "@"
+	players["localPlayer"]["frozen"] = false
+	rmplane.GUI.playerPanel.carryingText.text = ""
+	for k,v in pairs(mapmaker.GUI) do
+		if v.x then v.x = v.x - 100 end
+		if v.y then v.y = v.y - 100 end
+	end
+	for k,v in pairs(rmplane.GUI) do
+		if v.x then v.x = v.x + 100 end
+		if v.y then v.y = v.y + 100 end
+	end
+	local maxCt = map["xSize"]*map["ySize"]
+	local ct = 0
+	local ctRate = math.floor(maxCt/20)
+	for i=1,map["xSize"] do
+		for j=1,map["ySize"] do
+			ct = ct + 1
+			if map["tileMap"][i][j] then
+				if map["tileMap"][i][j].scripts and map["tileMap"][i][j].scripts.onLoad then
+					local localArgs = map["tileMap"][i][j].scripts.onLoad(map["tileMap"][i][j],i,j,{
+						["players"] = players,
+					},map)
+					
+					if localArgs and localArgs["object"] then
+						for k,v in pairs(localArgs["object"]) do
+							map["tileMap"][i][j][k] = v
+						end
+					end
+				end
+			end
+			if map["entityMap"][i][j] then
+				if map["entityMap"][i][j].scripts and map["entityMap"][i][j].scripts.onLoad then
+					local localArgs = map["entityMap"][i][j].scripts.onLoad(map["entityMap"][i][j],i,j,{
+						["players"] = players,
+					},map)
+					
+					if localArgs and localArgs["object"] then
+						for k,v in pairs(localArgs["object"]) do
+							map["entityMap"][i][j][k] = v
+						end
+					end
+				end
+			end
+			if ct % ctRate == 0 then
+				loadingLevelGUI.LoadingBar:resize(tostring(math.ceil((ct/maxCt)*50)).."%",1)
+				cobalt_draw()
+			end
+		end
+	end
+	camera.x = players["localPlayer"].x-math.floor(camera.xSize/2)
+	camera.y = players["localPlayer"].y-math.floor(camera.ySize/2)
+	cobalt.state = "game"
 end
 
 --loadMap(fs.getDir(shell.getRunningProgram()).."/maps/level1.rpmap")
@@ -755,7 +1123,11 @@ function cobalt.draw()
 					if not map["tileMap"][i][j].x then map["tileMap"][i][j].x = i end
 					if not map["tileMap"][i][j].y then map["tileMap"][i][j].y = j end
 					if determineVisibility(players.localPlayer,map["tileMap"][i][j]) or application == "mapmaker" then
-						cobalt.graphics.print(map["tileMap"][i][j]["icon"]["text"],i-camera.x,j-camera.y,map["tileMap"][i][j]["icon"]["bg"],map["tileMap"][i][j]["icon"]["fg"])
+						if viewMetaData then
+							cobalt.graphics.print(map["tileMap"][i][j]["metaData"],i-camera.x,j-camera.y,map["tileMap"][i][j]["icon"]["bg"],map["tileMap"][i][j]["icon"]["fg"])
+						else
+							cobalt.graphics.print(map["tileMap"][i][j]["icon"]["text"],i-camera.x,j-camera.y,map["tileMap"][i][j]["icon"]["bg"],map["tileMap"][i][j]["icon"]["fg"])
+						end
 						
 						map["tileMapMemory"][i][j] = {}
 						map["tileMapMemory"][i][j].icon = {} 
@@ -783,7 +1155,11 @@ function cobalt.draw()
 					if not map["entityMap"][i][j].x then map["entityMap"][i][j].x = i end
 					if not map["entityMap"][i][j].y then map["entityMap"][i][j].y = j end
 					if determineVisibility(players.localPlayer,map["entityMap"][i][j]) or application == "mapmaker" then
-						cobalt.graphics.print(map["entityMap"][i][j]["icon"]["text"],i-camera.x,j-camera.y,map["entityMap"][i][j]["icon"]["bg"],map["entityMap"][i][j]["icon"]["fg"])
+						if viewMetaData then
+							cobalt.graphics.print(map["entityMap"][i][j]["metaData"],i-camera.x,j-camera.y,map["entityMap"][i][j]["icon"]["bg"],map["entityMap"][i][j]["icon"]["fg"])
+						else
+							cobalt.graphics.print(map["entityMap"][i][j]["icon"]["text"],i-camera.x,j-camera.y,map["entityMap"][i][j]["icon"]["bg"],map["entityMap"][i][j]["icon"]["fg"])
+						end
 						
 						map["entityMapMemory"][i][j] = {}
 						map["entityMapMemory"][i][j].icon = {} 
@@ -799,6 +1175,30 @@ function cobalt.draw()
 			end
 		end
 		
+		if application == "mapmaker" then
+			if totalTicks%2 == 0 then
+				if selection["cornerA"] and selection["cornerB"] then
+					local dx = selection["cornerB"]["x"]-selection["cornerA"]["x"]
+					local dy = selection["cornerB"]["y"]-selection["cornerA"]["y"]
+					local a = 1
+					local b = 1
+					if dx < 0 then a = -1 end
+					if dy < 0 then b = -1 end
+					for i=0,dx,a do
+						if selection["cornerA"]["x"]+i-camera.x <= camera["xSize"] then
+							for j=0,dy,b do
+								if selection["cornerA"]["y"]+j-camera.y <= camera["ySize"] then
+									cobalt.graphics.print("+",selection["cornerA"]["x"]+i-camera.x,selection["cornerA"]["y"]+j-camera.y,nil,colors.lime)
+								end
+							end
+						end
+					end
+				elseif selection["cornerA"] then
+					cobalt.graphics.print("+",selection["cornerA"]["x"]-camera.x,selection["cornerA"]["y"]-camera.y,nil,colors.lime)
+				end
+			end
+		end
+		
 		if application == "rmplane" then
 			for k,v in pairs(players) do
 				if v.x >= camera.x and v.x <= camera.x+camera.xSize then
@@ -808,6 +1208,7 @@ function cobalt.draw()
 				end
 				--cobalt.graphics.print("X - "..v.x,3,1,nil,colors.white)
 				--cobalt.graphics.print("Y - "..v.y,3,2,nil,colors.white)
+				cobalt.graphics.print("CTRL to pause",38,18,nil,colors.white)
 			end
 		end
 		
@@ -816,6 +1217,7 @@ function cobalt.draw()
 			cobalt.graphics.print("Camera Y - "..camera.y,3,18,nil,colors.white)
 			cobalt.graphics.print("Mouse X - "..lastMouse.x+lastMouse.cx,20,17,nil,colors.white)
 			cobalt.graphics.print("Mouse Y - "..lastMouse.y+lastMouse.cy,20,18,nil,colors.white)
+			cobalt.graphics.print("CTRL to exit",38,18,nil,colors.white)
 		end
 		
 		if map.scriptBinds and map.scriptBinds.onDraw then
@@ -825,8 +1227,6 @@ function cobalt.draw()
 				end
 			end
 		end
-		
-		cobalt.graphics.print("CTRL to pause",38,18,nil,colors.white)
 	elseif cobalt.state == "paused" then
 	
 	elseif cobalt.state == "intro" then
@@ -870,37 +1270,34 @@ function cobalt.mousepressed( x, y, button )
 					mapmaker.GUI.inspectPanelMetaData.text = tostring(map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy].metaData) or "0"
 				end
 			elseif button == 1 then
-				if mapmaker.GUI.IDType == "tile" then
-					if tileTypes[tonumber(mapmaker.GUI.IDField.text)] then
-						if map.tileMap[lastMouse.x+lastMouse.cx] and map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] then
-							local object = map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy]
-							for k,v in pairs(tileTypes[tonumber(mapmaker.GUI.IDField.text)]) do
-								object[k] = v
-							end
-							object.x = lastMouse.x+lastMouse.cx
-							object.y = lastMouse.y+lastMouse.cy
-							object.type = tonumber(mapmaker.GUI.IDField.text) or 0
-							object.metaData = tonumber(mapmaker.GUI.IDMetaDataField.text) or 0
-						end
+				if shiftHeld then
+					--[[if selection["cornerB"] then
+						selection["cornerA"] = nil
+						selection["cornerB"] = nil]]--
+					if selection["cornerA"] then
+						selection["cornerB"] = {
+							["x"] = lastMouse.x+lastMouse.cx,
+							["y"] = lastMouse.y+lastMouse.cy,
+						}
+					else
+						selection["cornerA"] = {
+							["x"] = lastMouse.x+lastMouse.cx,
+							["y"] = lastMouse.y+lastMouse.cy,
+						}
 					end
-				elseif mapmaker.GUI.IDType == "entity" then
-					if entityTypes[tonumber(mapmaker.GUI.IDField.text)] then
-						if map.entityMap[lastMouse.x+lastMouse.cx] and map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] then
-							local object = map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy]
-							for k,v in pairs(entityTypes[tonumber(mapmaker.GUI.IDField.text)]) do
-								object[k] = v
-							end
-							object.x = lastMouse.x+lastMouse.cx
-							object.y = lastMouse.y+lastMouse.cy
-							object.type = tonumber(mapmaker.GUI.IDField.text) or 0
-							object.metaData = tonumber(mapmaker.GUI.IDMetaDataField.text) or 0
+				else
+					selection["cornerA"] = nil
+					selection["cornerB"] = nil
+					if mapmaker.GUI.IDType == "tile" then
+						spawnTile(lastMouse.x+lastMouse.cx,lastMouse.y+lastMouse.cy)
+					elseif mapmaker.GUI.IDType == "entity" then
+						spawnEntity(lastMouse.x+lastMouse.cx,lastMouse.y+lastMouse.cy)
+					elseif mapmaker.GUI.IDType == "delete" then
+						if map.entityMap[lastMouse.x+lastMouse.cx] and map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] and map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy].name then
+							map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] = {}
+						elseif map.tileMap[lastMouse.x+lastMouse.cx] and map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] and map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy].name then
+							map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] = {}
 						end
-					end
-				elseif mapmaker.GUI.IDType == "delete" then
-					if map.entityMap[lastMouse.x+lastMouse.cx] and map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] and map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy].name then
-						map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] = {}
-					elseif map.tileMap[lastMouse.x+lastMouse.cx] and map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] and map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy].name then
-						map.tileMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy] = {}
 					end
 				end
 			end
@@ -915,6 +1312,12 @@ function cobalt.mousepressed( x, y, button )
 				elseif button == 1 then
 					if not players["localPlayer"]["carrying"] and distanceOK(players["localPlayer"]["x"],players["localPlayer"]["y"],lastMouse.x+lastMouse.cx,lastMouse.y+lastMouse.cy) and map.tileMap[players["localPlayer"]["x"]][players["localPlayer"]["y"]]["itemPlaceable"] then
 						players["localPlayer"]["carrying"] = {}
+						--print(map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy])
+						--print(map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy]["scripts"])
+						--sleep(2)
+						if map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy]["scripts"]["onPickUp"] then
+							map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy]["scripts"]["onPickUp"](v,map,players)
+						end
 						for k,v in pairs(map.entityMap[lastMouse.x+lastMouse.cx][lastMouse.y+lastMouse.cy]) do
 							players["localPlayer"]["carrying"][k] = v
 						end
@@ -1086,9 +1489,28 @@ function cobalt.keypressed( keycode, key )
 			tick = tickRate -- Force an update when we move
 		end
 	end
-	if (cobalt.state == "paused" or cobalt.state == "game") and currentLevel then
-		if key == "leftCtrl" or key == "rightCtrl" then
+	if key == "leftCtrl" or key == "rightCtrl" then
+		if (cobalt.state == "paused" or cobalt.state == "game") and currentLevel then
 			if cobalt.state == "game" then cobalt.state = "paused" else cobalt.state = "game" end
+		elseif cobalt.state == "game" and currentLevel == nil and application == "rmplane" then
+			--print("HEY")
+			--sleep(1)
+			loadMap(fs.getDir(shell.getRunningProgram()).."/maps/autosave.rpmap")
+			application = "mapmaker"
+			--[[players["localPlayer"]["finishedLevel"] = false
+			players["localPlayer"]["icon"]["text"] = "@"
+			players["localPlayer"]["frozen"] = false]]--
+			rmplane.GUI.playerPanel.carryingText.text = ""
+			for k,v in pairs(rmplane.GUI) do
+				if v.x then v.x = v.x - 100 end
+				if v.y then v.y = v.y - 100 end
+			end
+			for k,v in pairs(mapmaker.GUI) do
+				if v.x then v.x = v.x + 100 end
+				if v.y then v.y = v.y + 100 end
+			end
+		elseif application == "mapmaker" then
+			cobalt.exit()
 		end
 	end
 	if cobalt.state == "game" and key == "q" then
@@ -1107,16 +1529,48 @@ function cobalt.keypressed( keycode, key )
 	if key == "z" then
 		players["localPlayer"]["farthestLevelUnlocked"] = 9
 	end
+	if key == "leftShift" then
+		shiftHeld = true
+	end
 	cobalt.ui.keypressed(keycode,key)
 	--error(os.time("utc"))-- - epoch)
 end
 
 function cobalt.keyreleased( keycode, key )
+	if key == "leftShift" then
+		shiftHeld = false
+	end
 	cobalt.ui.keyreleased(keycode,key)
 end
 
 function cobalt.textinput( t )
 	cobalt.ui.textinput(t)
+end
+
+if application == "mapmaker" then
+	local a = nil
+	if fs.exists(fs.getDir(shell.getRunningProgram()).."/maps/"..args[1]) then
+		a = fs.getDir(shell.getRunningProgram()).."/maps/"..args[1]
+	elseif fs.exists(fs.getDir(shell.getRunningProgram()).."/maps/"..args[1]..".rpmap") then
+		a = fs.getDir(shell.getRunningProgram()).."/maps/"..args[1]..".rpmap"
+	end
+	local good = false
+	if a == nil then
+		--[[print(fs.getDir(shell.getRunningProgram()).."/maps/"..args[1]..".rpmap")
+		local handle = fs.open(fs.getDir(shell.getRunningProgram()).."/maps/"..args[1]..".rpmap","w")
+		handle.writeLine(args[1])
+		handle.writeLine(255)
+		handle.writeLine(255)
+		handle.close()]]--
+		workingPath = fs.getDir(shell.getRunningProgram()).."/maps/"..args[1]..".rpmap"
+		good = loadMap(fs.getDir(shell.getRunningProgram()).."/maps/"..args[1]..".rpmap",true)
+	else
+		workingPath = a
+		good = loadMap(a)
+	end
+	if good == false then
+		cobalt.exit()
+	end
 end
 
 cobalt.initLoop()

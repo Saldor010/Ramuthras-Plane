@@ -320,6 +320,7 @@ local tileTypes = {
 		["itemPlaceable"] = false,
 		["scripts"] = {},
 		["activated"] = false,
+		["pushAmount"] = 1,
 		["connectedLogic"] = {},
 	},
 	[13] = {
@@ -350,6 +351,22 @@ local tileTypes = {
 		["itemPlaceable"] = false,
 		["scripts"] = {},
 	},
+	[15] = {
+		["name"] = "Piston x2",
+		["description"] = "An extended piston that can push objects twice as far as an ordinary piston.",
+		["icon"] = {
+			["text"] = ">",
+			["bg"] = colors.blue,
+			["fg"] = colors.white,
+		},
+		["passable"] = true,
+		["transparent"] = true,
+		["itemPlaceable"] = false,
+		["scripts"] = {},
+		["activated"] = false,
+		["pushAmount"] = 2,
+		["connectedLogic"] = {},
+	},
 	[100] = {
 		["name"] = "Exit Portal",
 		["description"] = "Walk through this portal to finish the level!",
@@ -370,7 +387,7 @@ local tileTypes = {
 				end
 			end,]]--
 		},
-	}
+	},
 }
 
 local entityTypes = {
@@ -447,8 +464,46 @@ local entityTypes = {
 			["bg"] = colors.black,
 			["fg"] = colors.grey
 		},
+		["scripts"] = {},
 		["movedThisTick"] = false,
-	}
+	},
+	[100] = {
+		["name"] = "Crystal",
+		["description"] = "Grab this to finish the level!",
+		["icon"] = {
+			["text"] = string.char(4),
+			["bg"] = colors.black,
+			["fg"] = colors.lime,
+		},
+		["movedThisTick"] = false,
+		["scripts"] = {
+			["onLoad"] = function(tile,tx,ty,localArgs,map)
+				local v = map["entityMap"][tx][ty]
+				local returnValue = {
+					["object"] = {
+						["icon"] = v["icon"]
+					}
+				}
+				if v["metaData"] == 1 then
+					returnValue["object"]["icon"]["text"] = string.char(4)
+					returnValue["object"]["icon"]["fg"] = colors.red
+					returnValue["object"]["name"] = "Red Crystal"
+				elseif v["metaData"] == 2 then
+					returnValue["object"]["icon"]["text"] = string.char(6)
+					returnValue["object"]["icon"]["fg"] = colors.lime
+					returnValue["object"]["name"] = "Green Crystal"
+				elseif v["metaData"] == 3 then
+					returnValue["object"]["icon"]["text"] = string.char(5)
+					returnValue["object"]["icon"]["fg"] = colors.blue
+					returnValue["object"]["name"] = "Blue Crystal"
+				end
+				return returnValue
+			end,
+			["onPickUp"] = function(v,map,players)
+				players["localPlayer"]["finishedLevel"] = true
+			end,
+		},
+	},
 }
 
 local newTileTypes = {}
@@ -515,7 +570,7 @@ local function pressurePadLoad(object,tx,ty,localArgs,map)
 				table.insert(object["gates"],b)
 			elseif (b.type == 9) and b.metaData == object.metaData then
 				table.insert(object["magicalWalls"],b)
-			elseif (b.type == 12) and math.floor(b.metaData/4) == object.metaData then
+			elseif (b.type == 12 or b.type == 15) and math.floor(b.metaData/4) == object.metaData then
 				table.insert(object["pistons"],b)
 			elseif object["connectedLogic"] and b["connectedLogic"] and b.metaData == object.metaData then--object["name"] == "B.Pressure Pad" and b.metaData == object.metaData and b["connectedLogic"] then
 				table.insert(object["connectedLogic"],b)
@@ -612,7 +667,11 @@ local function pressurePadUpdate(object,map,players)
 				local returnTile = b
 				returnTile["icon"]["bg"] = colors.red
 				returnTile["icon"]["fg"] = colors.yellow
-				returnTile["name"] = "Activated Piston"
+				if returnTile["pushAmount"] == 1 then
+					returnTile["name"] = "Activated Piston"
+				elseif returnTile["pushAmount"] == 2 then
+					returnTile["name"] = "Activated Piston x2"
+				end
 				returnTile["description"] = "An iron base fitted with an extended flat head."
 				
 				local dX = 0
@@ -639,22 +698,33 @@ local function pressurePadUpdate(object,map,players)
 				print(x.." / "..y)
 				print(x2.." / "..y2)]]--
 				--sleep(0.5)
-				if entityMap[x] and entityMap[x][y] and entityMap[x][y]["name"] and entityMap[x2] and entityMap[x2][y2] and entityMap[x2][y2]["name"] == nil then
-					local function recursion(a,b)
-						for k,v in pairs(a) do
-							if type(v) == "table" then
-								b[k] = {}
-								recursion(v,b[k])
-							else
-								b[k] = v
-							end
+				if entityMap[x] and entityMap[x][y] and entityMap[x][y]["name"] then 
+					local furthest = 0
+					for i=1,b["pushAmount"] do
+						if (entityMap[x + (dX*i)] and entityMap[x + (dX*i)][y + (dY*i)] and entityMap[x + (dX*i)][y + (dY*i)]["name"] == nil)
+						and (tileMap[x + (dX*i)] and tileMap[x + (dX*i)][y + (dY*i)] and tileMap[x + (dX*i)][y + (dY*i)]["passable"] == true and tileMap[x + (dX*i)][y + (dY*i)]["itemPlaceable"] == true) then 
+							furthest = i
+						else
+							break
 						end
 					end
-					--[[for k,v in pairs(entityMap[x][y]) do
-						entityMap[x2][y2][k] = v
-					end]]--
-					recursion(entityMap[x][y],entityMap[x2][y2])
-					entityMap[x][y] = {}
+					if furthest > 0 then
+						local function recursion(a,b)
+							for k,v in pairs(a) do
+								if type(v) == "table" then
+									b[k] = {}
+									recursion(v,b[k])
+								else
+									b[k] = v
+								end
+							end
+						end
+						--[[for k,v in pairs(entityMap[x][y]) do
+							entityMap[x2][y2][k] = v
+						end]]--
+						recursion(entityMap[x][y],entityMap[x + (dX*furthest)][y + (dY*furthest)])
+						entityMap[x][y] = {}
+					end
 				end
 				
 				table.insert(returnData.tileMap,returnTile)
@@ -710,10 +780,17 @@ local function pressurePadUpdate(object,map,players)
 		end
 		for p,b in pairs(object["pistons"]) do
 			local returnTile = b
-			returnTile["icon"]["bg"] = colors.gray
-			returnTile["icon"]["fg"] = colors.white
-			returnTile["name"] = "Piston"
-			returnTile["description"] = "An iron base fitted with a flat head, it looks like it could push something."
+			if returnTile["pushAmount"] == 1 then
+				returnTile["icon"]["bg"] = colors.gray
+				returnTile["icon"]["fg"] = colors.white
+				returnTile["name"] = "Piston"
+				returnTile["description"] = "An iron base fitted with a flat head, it looks like it could push something."
+			elseif returnTile["pushAmount"] == 2 then
+				returnTile["icon"]["bg"] = colors.blue
+				returnTile["icon"]["fg"] = colors.white
+				returnTile["name"] = "Piston x2"
+				returnTile["description"] = "An extended piston that can push objects twice as far as an ordinary piston."
+			end
 			table.insert(returnData.tileMap,returnTile)
 		end
 	end
@@ -883,6 +960,10 @@ tileTypes[13]["scripts"]["onUpdate"] = function(object,map,players)
 end
 
 tileTypes[12]["scripts"]["onLoad"] = function(object,tx,ty,localArgs,map)
+	return directionalLoad(object,tx,ty,localArgs,map)
+end
+
+tileTypes[15]["scripts"]["onLoad"] = function(object,tx,ty,localArgs,map)
 	return directionalLoad(object,tx,ty,localArgs,map)
 end
 	
